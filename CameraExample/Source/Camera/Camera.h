@@ -30,6 +30,7 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 
 @property(nonatomic, assign, readonly) CameraMode mode;
 @property(nonatomic, assign, readonly) AVCaptureDevicePosition position;
+@property(nonatomic, assign, readonly) AVCaptureFlashMode flash;
 @property(nonatomic, assign, readonly) BOOL livePhotoSupported;
 @property(nonatomic, assign, readonly) BOOL livePhotoEnable;
 @property(nonatomic, assign, readonly) BOOL depthDataDeliverySupported;

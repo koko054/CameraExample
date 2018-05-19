@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		7A1FB90620AFEB4500DDA9AA /* AVCamPreviewView.m in Sources */ = {isa = PBXBuildFile; fileRef = 7A1FB90420AFEB4500DDA9AA /* AVCamPreviewView.m */; };
 		7A1FB90920AFEE2B00DDA9AA /* AVCaptureDeviceDiscoverySession+Utilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 7A1FB90820AFEE2B00DDA9AA /* AVCaptureDeviceDiscoverySession+Utilities.m */; };
+		7A476DF620B0675100B668C5 /* CaptureDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 7A476DF520B0675100B668C5 /* CaptureDelegate.m */; };
 		7A8CFC7020AFD18E0051F1D0 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 7A8CFC6F20AFD18E0051F1D0 /* AppDelegate.m */; };
 		7A8CFC7320AFD18E0051F1D0 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 7A8CFC7220AFD18E0051F1D0 /* ViewController.m */; };
 		7A8CFC7620AFD18E0051F1D0 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7A8CFC7420AFD18E0051F1D0 /* Main.storyboard */; };
@@ -23,6 +24,8 @@
 		7A1FB90520AFEB4500DDA9AA /* AVCamPreviewView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AVCamPreviewView.h; sourceTree = "<group>"; };
 		7A1FB90720AFEE2B00DDA9AA /* AVCaptureDeviceDiscoverySession+Utilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "AVCaptureDeviceDiscoverySession+Utilities.h"; sourceTree = "<group>"; };
 		7A1FB90820AFEE2B00DDA9AA /* AVCaptureDeviceDiscoverySession+Utilities.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "AVCaptureDeviceDiscoverySession+Utilities.m"; sourceTree = "<group>"; };
+		7A476DF420B0675100B668C5 /* CaptureDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CaptureDelegate.h; sourceTree = "<group>"; };
+		7A476DF520B0675100B668C5 /* CaptureDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CaptureDelegate.m; sourceTree = "<group>"; };
 		7A8CFC6B20AFD18E0051F1D0 /* CameraExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CameraExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7A8CFC6E20AFD18E0051F1D0 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		7A8CFC6F20AFD18E0051F1D0 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
@@ -66,6 +69,8 @@
 			children = (
 				7A8CFC8720AFD4240051F1D0 /* Camera.h */,
 				7A8CFC8820AFD4240051F1D0 /* Camera.m */,
+				7A476DF420B0675100B668C5 /* CaptureDelegate.h */,
+				7A476DF520B0675100B668C5 /* CaptureDelegate.m */,
 			);
 			path = Camera;
 			sourceTree = "<group>";
@@ -202,6 +207,7 @@
 				7A8CFC7E20AFD18F0051F1D0 /* main.m in Sources */,
 				7A8CFC7020AFD18E0051F1D0 /* AppDelegate.m in Sources */,
 				7A1FB90620AFEB4500DDA9AA /* AVCamPreviewView.m in Sources */,
+				7A476DF620B0675100B668C5 /* CaptureDelegate.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

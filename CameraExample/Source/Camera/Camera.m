@@ -60,6 +60,7 @@ static void *SessionRunningContext = &SessionRunningContext;
   if (self = [super init]) {
     _mode = mode;
     _position = position;
+    _flash = AVCaptureFlashModeAuto;
     _livePhotoEnable = NO;
     _depthDataDeliveryEnable = NO;
     
@@ -112,6 +113,9 @@ static void *SessionRunningContext = &SessionRunningContext;
 }
 
 - (void)capturePhoto:(void (^)(UIImage *photo))complete {
+  dispatch_async([Camera sessionQueue], ^{
+    
+  });
 }
 
 #pragma mark - camera options
@@ -172,6 +176,12 @@ static void *SessionRunningContext = &SessionRunningContext;
   });
 }
 
+- (void)setFlash:(AVCaptureFlashMode)flash {
+  if (_flash != flash) {
+    _flash = flash;
+  }
+}
+
 - (void)setLivePhotoEnable:(BOOL)livePhotoEnable {
   if (_livePhotoEnable != livePhotoEnable) {
     // livePhoto 지원이 안되는데 livePhoto를 활성화할 경우 예외처리
@@ -195,7 +205,6 @@ static void *SessionRunningContext = &SessionRunningContext;
   return self.cameraDevice.activeFormat;
 }
 
-#pragma mark - objects
 - (AVCaptureDeviceDiscoverySession *)cameraDiscoverySession {
   if (!_cameraDiscoverySession) {
     NSArray<AVCaptureDeviceType> *deviceTypes =
@@ -287,5 +296,54 @@ static void *SessionRunningContext = &SessionRunningContext;
   }
   return YES;
 }
+
+- (AVCapturePhotoSettings *)configurePhotoSetting {
+  // AVCapturePhotoSettings 생성
+  AVCapturePhotoSettings *setting;
+  if (@available(iOS 11.0, *)) {
+    if ([self.photoOutput.availablePhotoCodecTypes containsObject:AVVideoCodecTypeHEVC]) {
+      setting = [AVCapturePhotoSettings photoSettingsWithFormat:@{ AVVideoCodecKey : AVVideoCodecTypeHEVC }];
+    } else {
+      setting = [AVCapturePhotoSettings photoSettings];
+    }
+  } else {
+    setting = [AVCapturePhotoSettings photoSettings];
+  }
+  
+  // flash 모드적용
+  if (self.cameraDevice.isFlashAvailable) {
+    [[self.photoOutput supportedFlashModes] enumerateObjectsUsingBlock:^(NSNumber *mode, NSUInteger idx, BOOL *stop){
+      if (mode.integerValue == self.flash) {
+        setting.flashMode = self.flash;
+        *stop = YES;
+      }
+    }];
+  }
+  
+  setting.highResolutionPhotoEnabled = YES; // 해상도 최대로 사용?
+  
+  if (setting.availablePreviewPhotoPixelFormatTypes.count > 0) { // 이건 뭐하는 건지 모르겠다. 예제에 있길래 넣은 코드
+    setting.previewPhotoFormat = @{ (NSString *)kCVPixelBufferPixelFormatTypeKey : setting.availablePreviewPhotoPixelFormatTypes.firstObject };
+  }
+  
+  // 라이브포토설정, 라이브포토를 임시저장해놓을 경로설정
+  if (self.livePhotoEnable && self.livePhotoSupported) {
+    NSString *livePhotoMovieFileName = [NSUUID UUID].UUIDString;
+    NSString *livePhotoMovieFilePath = [NSTemporaryDirectory() stringByAppendingPathComponent:[livePhotoMovieFileName stringByAppendingPathExtension:@"mov"]];
+    setting.livePhotoMovieFileURL = [NSURL fileURLWithPath:livePhotoMovieFilePath];
+  }
+  
+  // depth data 설정
+  if (@available(iOS 11.0, *)) {
+    if (self.depthDataDeliveryEnable && self.depthDataDeliverySupported) {
+      setting.depthDataDeliveryEnabled = YES;
+    } else {
+      setting.depthDataDeliveryEnabled = NO;
+    }
+  }
+  
+  return setting;
+}
+
 
 @end

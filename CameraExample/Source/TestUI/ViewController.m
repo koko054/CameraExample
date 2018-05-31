@@ -51,33 +51,37 @@
   [self.buttonPanel addSubview:self.flashButton];
   [self.buttonPanel addSubview:self.focusModeButton];
   [self.buttonPanel addSubview:self.exposureModeButton];
-  
 
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(applicationWillEnterForeground)
-                                               name:UIApplicationWillEnterForegroundNotification
-                                             object:nil];
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(applicationDidEnterBackground)
-                                               name:UIApplicationDidEnterBackgroundNotification
-                                             object:nil];
-  
-  [Camera configureCamera:^(Camera *camera, NSError *error){
+  [[NSNotificationCenter defaultCenter]
+      addObserver:self
+         selector:@selector(applicationWillEnterForeground)
+             name:UIApplicationWillEnterForegroundNotification
+           object:nil];
+  [[NSNotificationCenter defaultCenter]
+      addObserver:self
+         selector:@selector(applicationDidEnterBackground)
+             name:UIApplicationDidEnterBackgroundNotification
+           object:nil];
+
+  [Camera configureCamera:^(Camera *camera, NSError *error) {
     if (camera) {
       dispatch_async(dispatch_get_main_queue(), ^{
         CGSize cameraResolution = camera.resolution;
         CGFloat width = self.view.frame.size.width;
-        CGFloat height = ceil(cameraResolution.width * width / cameraResolution.height);
-        self.previewView.frame = CGRectMake(0.0, 0.0, self.view.frame.size.width, height);
+        CGFloat height =
+            ceil(cameraResolution.width * width / cameraResolution.height);
+        self.previewView.frame =
+            CGRectMake(0.0, 0.0, self.view.frame.size.width, height);
         self.previewView.session = camera.session;
         self.camera = camera;
         [self.camera startCapture];
-        [UIView animateWithDuration:0.3 animations:^{
-          self.previewView.alpha = 1.0;
-        }];
+        [UIView animateWithDuration:0.3
+                         animations:^{
+                           self.previewView.alpha = 1.0;
+                         }];
       });
     } else {
-      NSLog(@"Failed configureCamera : %@",error.localizedDescription);
+      NSLog(@"Failed configureCamera : %@", error.localizedDescription);
     }
   }];
 }
@@ -104,7 +108,8 @@
   if (!_previewView) {
     _previewView = [[AVCamPreviewView alloc] init];
     _previewView.backgroundColor = UIColor.blueColor;
-    _previewView.videoPreviewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
+    _previewView.videoPreviewLayer.videoGravity =
+        AVLayerVideoGravityResizeAspectFill;
     _previewView.alpha = 0.0;
   }
   return _previewView;
@@ -112,9 +117,10 @@
 
 - (UIView *)buttonPanel {
   if (!_buttonPanel) {
-    CGFloat top = self.view.frame.size.width * 4/3;
+    CGFloat top = self.view.frame.size.width * 4 / 3;
     CGFloat height = self.view.frame.size.height - top;
-    _buttonPanel = [[UIView alloc] initWithFrame:CGRectMake(0.0, top, self.view.frame.size.width, height)];
+    _buttonPanel = [[UIView alloc]
+        initWithFrame:CGRectMake(0.0, top, self.view.frame.size.width, height)];
     _buttonPanel.backgroundColor = UIColor.clearColor;
   }
   return _buttonPanel;
@@ -124,7 +130,8 @@
   CGFloat size = self.buttonPanel.frame.size.width * 0.25;
   CGFloat left = size * column;
   CGFloat top = size * row;
-  UIButton *button = [[UIButton alloc] initWithFrame:CGRectMake(left, top, size, size)];
+  UIButton *button =
+      [[UIButton alloc] initWithFrame:CGRectMake(left, top, size, size)];
   button.backgroundColor = UIColor.whiteColor;
   button.layer.borderColor = UIColor.blackColor.CGColor;
   button.layer.borderWidth = 1.0;
@@ -132,7 +139,9 @@
   [button setTitleColor:UIColor.blackColor forState:UIControlStateNormal];
   [button setTitleColor:UIColor.blackColor forState:UIControlStateSelected];
   [button setTitleColor:UIColor.blackColor forState:UIControlStateHighlighted];
-  [button addTarget:self action:@selector(touchedUpButtons:) forControlEvents:UIControlEventTouchUpInside];
+  [button addTarget:self
+                action:@selector(touchedUpButtons:)
+      forControlEvents:UIControlEventTouchUpInside];
   return button;
 }
 
@@ -198,42 +207,50 @@
 - (void)touchedUpButtons:(UIButton *)sender {
   if (sender == self.captureButton) {
   } else if (sender == self.cameraModeButton) {
-    if (NO) { // no animation
-      [self.camera switchMode];
-      self.cameraModeButton.selected = self.camera.mode == CameraModeVideo;
-    } else { // use camera option change animation;
-      [UIView animateWithDuration:0.3
-                       animations:^{
-                         self.previewView.alpha = 0.0;
-                       }];
-      CameraMode newMode = self.camera.mode == CameraModePhoto ? CameraModeVideo : CameraModePhoto;
-      
-      __block typeof(self) blockSelf = self;
-      [self.camera setMode:newMode
-                  complete:^{
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                      blockSelf.cameraModeButton.selected = blockSelf.camera.mode == CameraModeVideo;
-                      [blockSelf.previewView.layer removeAllAnimations];
-                      [UIView animateWithDuration:0.3
-                                       animations:^{
-                                         blockSelf.previewView.alpha = 1.0;
-                                       }];
-                    });
-                  }];
-    }
+    [self showCameraPreview:NO];
+    CameraMode newMode =
+        self.camera.mode == CameraModePhoto ? CameraModeVideo : CameraModePhoto;
+    __block typeof(self) blockSelf = self;
+    [self.camera setMode:newMode
+                complete:^{
+                  dispatch_async(dispatch_get_main_queue(), ^{
+                    blockSelf.cameraModeButton.selected =
+                        blockSelf.camera.mode == CameraModeVideo;
+                    [blockSelf showCameraPreview:YES];
+                  });
+                }];
   } else if (sender == self.rotateButton) {
-    [self.camera switchCamera];
-    self.rotateButton.selected = self.camera.position == AVCaptureDevicePositionFront;
+    [self showCameraPreview:NO];
+    AVCaptureDevicePosition newPosition =
+        self.camera.position == AVCaptureDevicePositionFront
+            ? AVCaptureDevicePositionBack
+            : AVCaptureDevicePositionFront;
+    __block typeof(self) blockSelf = self;
+    [self.camera
+        setPosition:newPosition
+           complete:^{
+             dispatch_async(dispatch_get_main_queue(), ^{
+               blockSelf.rotateButton.selected =
+                   blockSelf.camera.position == AVCaptureDevicePositionFront;
+               [blockSelf showCameraPreview:YES];
+             });
+           }];
   } else if (sender == self.livePhotoButton) {
     [self.camera switchLivePhoto];
     self.livePhotoButton.selected = self.camera.livePhotoEnable;
   } else if (sender == self.flashButton) {
-    
   } else if (sender == self.focusModeButton) {
-    
   } else if (sender == self.exposureModeButton) {
-    
   }
+}
+
+- (void)showCameraPreview:(BOOL)show {
+  CGFloat alpha = show ? 1.0 : 0.0;
+  [self.previewView.layer removeAllAnimations];
+  [UIView animateWithDuration:0.3
+                   animations:^{
+                     self.previewView.alpha = alpha;
+                   }];
 }
 
 @end

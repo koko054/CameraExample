@@ -120,130 +120,77 @@
   return _buttonPanel;
 }
 
+- (UIButton *)testButtonRow:(NSInteger)row column:(NSInteger)column {
+  CGFloat size = self.buttonPanel.frame.size.width * 0.25;
+  CGFloat left = size * column;
+  CGFloat top = size * row;
+  UIButton *button = [[UIButton alloc] initWithFrame:CGRectMake(left, top, size, size)];
+  button.backgroundColor = UIColor.whiteColor;
+  button.layer.borderColor = UIColor.blackColor.CGColor;
+  button.layer.borderWidth = 1.0;
+  button.titleLabel.numberOfLines = 2;
+  [button setTitleColor:UIColor.blackColor forState:UIControlStateNormal];
+  [button setTitleColor:UIColor.blackColor forState:UIControlStateSelected];
+  [button setTitleColor:UIColor.blackColor forState:UIControlStateHighlighted];
+  [button addTarget:self action:@selector(touchedUpButtons:) forControlEvents:UIControlEventTouchUpInside];
+  return button;
+}
+
 - (UIButton *)captureButton {
   if (!_captureButton) {
-    CGFloat size = self.view.frame.size.width * 0.25;
-    CGFloat left = (self.buttonPanel.frame.size.width - size) * 0.5;
-    CGFloat top =  (self.buttonPanel.frame.size.height - size) * 0.5;
-    _captureButton = [[UIButton alloc] initWithFrame:CGRectMake(left, top, size, size)];
-    _captureButton.backgroundColor = UIColor.whiteColor;
-    _captureButton.layer.cornerRadius = size * 0.5;
+    _captureButton = [self testButtonRow:0 column:0];
     [_captureButton setTitle:@"촬영" forState:UIControlStateNormal];
-    [_captureButton setTitleColor:UIColor.blackColor forState:UIControlStateNormal];
-    [_captureButton addTarget:self action:@selector(touchedUpButtons:) forControlEvents:UIControlEventTouchUpInside];
   }
   return _captureButton;
 }
 
 - (UIButton *)cameraModeButton {
   if (!_cameraModeButton) {
-    CGFloat padding = 10;
-    CGFloat size = (self.buttonPanel.frame.size.height - (padding * 3.0)) * 0.45;
-    CGFloat top = padding;
-    CGFloat left = self.captureButton.frame.origin.x - size - padding;
-    _cameraModeButton = [[UIButton alloc] initWithFrame:CGRectMake(left, top, size, size)];
-    _cameraModeButton.backgroundColor = UIColor.whiteColor;
-    _cameraModeButton.layer.cornerRadius = size * 0.5;
-    _cameraModeButton.titleLabel.font = [UIFont systemFontOfSize:size * 0.15];
+    _cameraModeButton = [self testButtonRow:0 column:1];
     [_cameraModeButton setTitle:@"사진" forState:UIControlStateNormal];
     [_cameraModeButton setTitle:@"비디오" forState:UIControlStateSelected];
-    [_cameraModeButton setTitleColor:UIColor.blackColor forState:UIControlStateNormal];
-    [_cameraModeButton setTitleColor:UIColor.blackColor forState:UIControlStateSelected];
-    [_cameraModeButton addTarget:self action:@selector(touchedUpButtons:) forControlEvents:UIControlEventTouchUpInside];
   }
   return _cameraModeButton;
 }
 
 - (UIButton *)rotateButton {
   if (!_rotateButton) {
-    CGFloat padding = 10;
-    CGFloat size = (self.buttonPanel.frame.size.height - (padding * 3.0)) * 0.45;
-    CGFloat top = (self.buttonPanel.frame.size.height - size) * 0.5;
-    CGFloat left = padding;
-    _rotateButton = [[UIButton alloc] initWithFrame:CGRectMake(left, top, size, size)];
-    _rotateButton.backgroundColor = UIColor.whiteColor;
-    _rotateButton.layer.cornerRadius = size * 0.5;
-    _rotateButton.titleLabel.font = [UIFont systemFontOfSize:size * 0.15];
+    _rotateButton = [self testButtonRow:0 column:2];
     [_rotateButton setTitle:@"후면" forState:UIControlStateNormal];
     [_rotateButton setTitle:@"전면" forState:UIControlStateSelected];
-    [_rotateButton setTitleColor:UIColor.blackColor forState:UIControlStateNormal];
-    [_rotateButton setTitleColor:UIColor.blackColor forState:UIControlStateSelected];
-    [_rotateButton addTarget:self action:@selector(touchedUpButtons:) forControlEvents:UIControlEventTouchUpInside];
   }
   return _rotateButton;
 }
 
 - (UIButton *)livePhotoButton {
   if (!_livePhotoButton) {
-    CGFloat padding = 10;
-    CGFloat size = (self.buttonPanel.frame.size.height - (padding * 3.0)) * 0.45;
-    CGFloat top = self.buttonPanel.frame.size.height - size - padding;
-    CGFloat left = self.captureButton.frame.origin.x - size - padding;
-    _livePhotoButton = [[UIButton alloc] initWithFrame:CGRectMake(left, top, size, size)];
-    _livePhotoButton.backgroundColor = UIColor.whiteColor;
-    _livePhotoButton.layer.cornerRadius = size * 0.5;
-    _livePhotoButton.titleLabel.font = [UIFont systemFontOfSize:size * 0.15];
-    [_livePhotoButton setTitle:@"라이브포토 Off" forState:UIControlStateNormal];
-    [_livePhotoButton setTitle:@"라이브포토 On" forState:UIControlStateSelected];
-    [_livePhotoButton setTitleColor:UIColor.blackColor forState:UIControlStateNormal];
-    [_livePhotoButton setTitleColor:UIColor.blackColor forState:UIControlStateSelected];
-    [_livePhotoButton addTarget:self action:@selector(touchedUpButtons:) forControlEvents:UIControlEventTouchUpInside];
+    _livePhotoButton = [self testButtonRow:0 column:3];
+    [_livePhotoButton setTitle:@"live\nOff" forState:UIControlStateNormal];
+    [_livePhotoButton setTitle:@"live\nOn" forState:UIControlStateSelected];
   }
   return _livePhotoButton;
 }
 
 - (UIButton *)flashButton {
   if (!_flashButton) {
-    CGFloat padding = 10;
-    CGFloat top = self.cameraModeButton.frame.origin.y;
-    CGFloat size = (self.buttonPanel.frame.size.height - (padding * 3.0)) * 0.45;
-    CGFloat left = self.captureButton.frame.origin.x + self.captureButton.frame.size.width + padding;
-    _flashButton = [[UIButton alloc] initWithFrame:CGRectMake(left, top, size, size)];
-    _flashButton.backgroundColor = UIColor.whiteColor;
-    _flashButton.layer.cornerRadius = size * 0.5;
-    _flashButton.titleLabel.font = [UIFont systemFontOfSize:size * 0.15];
+    _flashButton = [self testButtonRow:1 column:0];
     [_flashButton setTitle:@"flash" forState:UIControlStateNormal];
-    [_flashButton setTitleColor:UIColor.blackColor forState:UIControlStateNormal];
-    [_flashButton setTitleColor:UIColor.blackColor forState:UIControlStateSelected];
-    [_flashButton addTarget:self action:@selector(touchedUpButtons:) forControlEvents:UIControlEventTouchUpInside];
   }
   return _flashButton;
 }
 
 - (UIButton *)focusModeButton {
   if (!_focusModeButton) {
-    CGFloat padding = 10;
-    CGFloat size = (self.buttonPanel.frame.size.height - (padding * 3.0)) * 0.45;
-    CGFloat top = (self.buttonPanel.frame.size.height - size) * 0.5;
-    CGFloat left = self.buttonPanel.frame.size.width - size - padding;
-    _focusModeButton = [[UIButton alloc] initWithFrame:CGRectMake(left, top, size, size)];
-    _focusModeButton.backgroundColor = UIColor.whiteColor;
-    _focusModeButton.layer.cornerRadius = size * 0.5;
-    _focusModeButton.titleLabel.font = [UIFont systemFontOfSize:size * 0.15];
-    [_focusModeButton setTitle:@"자동포커스" forState:UIControlStateNormal];
-    [_focusModeButton setTitleColor:UIColor.blackColor forState:UIControlStateNormal];
-    [_focusModeButton setTitleColor:UIColor.blackColor forState:UIControlStateSelected];
-    [_focusModeButton addTarget:self action:@selector(touchedUpButtons:) forControlEvents:UIControlEventTouchUpInside];
+    _focusModeButton = [self testButtonRow:1 column:1];
+    [_focusModeButton setTitle:@"auto\nfocus" forState:UIControlStateNormal];
   }
   return _focusModeButton;
 }
 
 - (UIButton *)exposureModeButton {
   if (!_exposureModeButton) {
-    CGFloat padding = 10;
-    CGFloat size = (self.buttonPanel.frame.size.height - (padding * 3.0)) * 0.45;
-    CGFloat top = self.buttonPanel.frame.size.height - size - padding;
-    CGFloat left = self.captureButton.frame.origin.x + self.captureButton.frame.size.width + padding;
-    _exposureModeButton = [[UIButton alloc] initWithFrame:CGRectMake(left, top, size, size)];
-    _exposureModeButton.backgroundColor = UIColor.whiteColor;
-    _exposureModeButton.layer.cornerRadius = size * 0.5;
-    _exposureModeButton.titleLabel.font = [UIFont systemFontOfSize:size * 0.15];
+    _exposureModeButton = [self testButtonRow:1 column:2];
     [_exposureModeButton setTitle:@"자동밝기" forState:UIControlStateNormal];
-    [_exposureModeButton setTitleColor:UIColor.blackColor forState:UIControlStateNormal];
-    [_exposureModeButton setTitleColor:UIColor.blackColor forState:UIControlStateSelected];
-    [_exposureModeButton addTarget:self
-                            action:@selector(touchedUpButtons:)
-                  forControlEvents:UIControlEventTouchUpInside];
   }
   return _exposureModeButton;
 }

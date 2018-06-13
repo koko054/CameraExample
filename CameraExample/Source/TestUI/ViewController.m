@@ -105,7 +105,7 @@
 - (AVCamPreviewView *)previewView {
   if (!_previewView) {
     _previewView = [[AVCamPreviewView alloc] init];
-    _previewView.backgroundColor = UIColor.blueColor;
+    _previewView.backgroundColor = UIColor.blackColor;
     _previewView.videoPreviewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
     _previewView.alpha = 0.0;
   }
@@ -176,7 +176,7 @@
 - (UIButton *)flashButton {
   if (!_flashButton) {
     _flashButton = [self testButtonRow:1 column:0];
-    [_flashButton setTitle:@"flash" forState:UIControlStateNormal];
+    [_flashButton setTitle:@"flash\nAuto" forState:UIControlStateNormal];
   }
   return _flashButton;
 }
@@ -253,6 +253,24 @@
     [self.camera setLivePhotoEnable:!self.camera.livePhotoEnable];
     self.livePhotoButton.selected = self.camera.livePhotoEnable;
   } else if (sender == self.flashButton) {
+    AVCaptureFlashMode nextFlash;
+    switch (self.camera.flash) {
+      case AVCaptureFlashModeOff:
+        nextFlash = AVCaptureFlashModeOn;
+        [self.flashButton setTitle:@"flash\nOn" forState:UIControlStateNormal];
+        break;
+      case AVCaptureFlashModeOn:
+        nextFlash = AVCaptureFlashModeAuto;
+        [self.flashButton setTitle:@"flash\nAuto" forState:UIControlStateNormal];
+        break;
+      case AVCaptureFlashModeAuto:
+        nextFlash = AVCaptureFlashModeOff;
+        [self.flashButton setTitle:@"flash\nOff" forState:UIControlStateNormal];
+        break;
+      default:
+        break;
+    }
+    [self.camera setFlash:nextFlash];
   } else if (sender == self.focusModeButton) {
   } else if (sender == self.exposureModeButton) {
   }

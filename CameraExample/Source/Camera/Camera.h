@@ -162,6 +162,13 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 - (void)setPosition:(AVCaptureDevicePosition)position complete:(void (^)(void))complete;
 
 /**
+ flash 모드 설정
+
+ @param flash AVCaptureFlashModeOff, AVCaptureFlashModeOn, AVCaptureFlashModeAuto
+ */
+- (void)setFlash:(AVCaptureFlashMode)flash;
+
+/**
  라이브포토 활성화/비활성화
 
  @param livePhotoEnable 활성화:YES, 비활성화:NO

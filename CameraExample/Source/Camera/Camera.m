@@ -386,6 +386,13 @@ static void *SessionRunningContext = &SessionRunningContext;
   });
 }
 
+// flash 설정
+- (void)setFlash:(AVCaptureFlashMode)flash {
+  if (_flash != flash) {
+    _flash = flash;
+  }
+}
+
 - (void)setLivePhotoEnable:(BOOL)livePhotoEnable {
   if (_livePhotoEnable != livePhotoEnable) {
     // livePhoto 지원이 안되는데 활성화할 경우 예외처리

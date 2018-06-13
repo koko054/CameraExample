@@ -35,6 +35,7 @@ static void *SessionRunningContext = &SessionRunningContext;
 
 #pragma mark - initialize
 
+// 카메라 세션 작업 큐 싱글톤객체로 생성
 + (dispatch_queue_t)sessionQueue {
   static dispatch_queue_t sessionQueue;
   static dispatch_once_t onceToken;
@@ -44,67 +45,81 @@ static void *SessionRunningContext = &SessionRunningContext;
   return sessionQueue;
 }
 
+// async하게 싱글톤객체생성
 + (void)configureCamera:(void (^)(Camera *camera, NSError *error))complete {
-  if (!complete) return;
-  dispatch_async([Camera sessionQueue], ^{
-    NSError *error;
-    Camera *camera = [[Camera alloc] initWithMode:CameraModePhoto position:AVCaptureDevicePositionBack error:&error];
-    complete(camera, error);
-  });
+  [Camera congifureCameraWithMode:CameraModePhoto position:AVCaptureDevicePositionBack complete:complete];
 }
 
+// async하게 싱글톤객체생성
 + (void)congifureCameraWithMode:(CameraMode)mode
                        position:(AVCaptureDevicePosition)position
                        complete:(void (^)(Camera *camera, NSError *error))complete {
   if (!complete) return;
-  dispatch_async([Camera sessionQueue], ^{
-    NSError *error;
-    Camera *camera = [[Camera alloc] initWithMode:mode position:position error:&error];
-    complete(camera, error);
+  static Camera *camera = nil;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    dispatch_async([Camera sessionQueue], ^{
+      NSError *error;
+      if (!camera) camera = [[Camera alloc] initWithMode:mode position:position error:&error];
+      complete(camera, error);
+    });
   });
 }
 
+// 객체생성
 - (instancetype)init {
   return [self initWithMode:CameraModePhoto position:AVCaptureDevicePositionBack error:nil];
 }
 
+// 객체생성
 - (instancetype)initWithMode:(CameraMode)mode position:(AVCaptureDevicePosition)position error:(NSError **)error {
   if (self = [super init]) {
+    // 프로퍼티초기화
     _mode = mode;
     _position = position;
     _flash = AVCaptureFlashModeAuto;
     _livePhotoEnable = NO;
     _depthDataDeliveryEnable = NO;
 
-
+    // 카메라모드에 따라 프리셋설정
     AVCaptureSessionPreset preset = mode == CameraModePhoto ? AVCaptureSessionPresetPhoto : AVCaptureSessionPresetHigh;
 
-    [self.captureSession beginConfiguration];
-    self.captureSession.sessionPreset = preset;
+    [self.captureSession beginConfiguration];    // 캡쳐 세션 설정시작
+    self.captureSession.sessionPreset = preset;  // 프리셋적용
 
-    if (![self configureCamera:error]) {
+    if (![self configureCameraDevice:error]) {  // 카메라설정하여 실패시 캡쳐 세션 설정종료 및 nil포인트반환
       [self.captureSession commitConfiguration];
       return nil;
     }
 
+    // 오디오입력 캡쳐세션에 연결
     AVCaptureDevice *audioDevice = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
     AVCaptureDeviceInput *audioInput = [AVCaptureDeviceInput deviceInputWithDevice:audioDevice error:error];
-
     if ([self.captureSession canAddInput:audioInput]) {
       [self.captureSession addInput:audioInput];
     }
 
+    // 사진출력 캡쳐세션에 연결
     if ([self.captureSession canAddOutput:self.photoOutput]) {
       [self.captureSession addOutput:self.photoOutput];
+
+      self.photoOutput.livePhotoCaptureEnabled = self.photoOutput.livePhotoCaptureSupported;
+      if (@available(iOS 11.0, *)) {
+        self.photoOutput.depthDataDeliveryEnabled = self.photoOutput.depthDataDeliverySupported;
+      }
+
     } else {
       [self.captureSession commitConfiguration];
       return nil;
     }
 
+    // 백그라운드ID 초기화
     self.backgroundRecordingID = UIBackgroundTaskInvalid;
-    
+
+    // 캡쳐세션 설정 종료
     [self.captureSession commitConfiguration];
 
+    // 사진챕쳐딜리게이트를 저장하는 dictionary 설정 및 초기화
     self.inProgressPhotoCaptureDelegates = [NSMutableDictionary dictionary];
     self.inProgressLivePhotoCapturesCount = 0;
   }
@@ -112,34 +127,45 @@ static void *SessionRunningContext = &SessionRunningContext;
 }
 
 #pragma mark - public functions
+
+// 외부 카메라출력뷰에 세션을 전달하기위한 함수
 - (AVCaptureSession *)session {
   return self.captureSession;
 }
 
+// 현재 카메라 포맷의 해상도를 전달하기위한 함수
 - (CGSize)resolution {
   return CGSizeMake(self.currentFormat.highResolutionStillImageDimensions.width,
                     self.currentFormat.highResolutionStillImageDimensions.height);
 }
 
+// 캡쳐세션 시작
 - (void)startCapture {
   [self.captureSession startRunning];
 }
 
+// 캡쳐세션 중지
 - (void)stopCapture {
   [self.captureSession stopRunning];
 }
 
+// 사진/라이브포토 촬영
 - (void)takePhotoWithDelegate:(id<CameraCaptureUIDelegate>)uiDelegate complete:(void (^)(void))complete {
   NSAssert(uiDelegate, @"uiDelegate can't be nil");
   dispatch_async([Camera sessionQueue], ^{
+    // 현재 카메라화면의 오리엔테이션을 적용
     AVCaptureConnection *photoOutputConnection = [self.photoOutput connectionWithMediaType:AVMediaTypeVideo];
     photoOutputConnection.videoOrientation = [uiDelegate captureOrientation];
 
+    // 사진촬영 설정객체 생성 (여기서 라이브포토로 찍을지, 그냥 사진촬영할지 결정된다. also depthDataDelivery)
     AVCapturePhotoSettings *settings = [self configurePhotoSetting];
 
+    // 라이브포토촬영시 촬영하는 데 시간이 걸리는데 연속해서 촬영할 경우 촬영프로세스를 여러개 동시에 돌리기 위해
+    // 실질적인 촬영기능을 CaptureDelegate 클래스로 분리하여 여러개의 객체를 생성하여 촬영한다.
     CaptureDelegate *captureDelegate = [[CaptureDelegate alloc] initWithSettings:settings
         captureAnimation:[uiDelegate captureAnimation]
         livePhotoHandler:^(BOOL capturing) {
+          // 라이브포토 카운드 관리
           if (capturing) {
             self.inProgressLivePhotoCapturesCount++;
           } else {
@@ -148,9 +174,9 @@ static void *SessionRunningContext = &SessionRunningContext;
 
           NSInteger inProgressLivePhotoCapturesCount = self.inProgressLivePhotoCapturesCount;
           dispatch_async(dispatch_get_main_queue(), ^{
-            if (inProgressLivePhotoCapturesCount > 0) {
+            if (inProgressLivePhotoCapturesCount > 0) {  // 라이브포토촬영이 진행중
               [uiDelegate capturingLivePhoto:YES];
-            } else if (inProgressLivePhotoCapturesCount == 0) {
+            } else if (inProgressLivePhotoCapturesCount == 0) {  // 라이브포토촬영 완료
               [uiDelegate capturingLivePhoto:NO];
             } else {
               NSLog(@"Error: In progress live photo capture count is less than "
@@ -158,35 +184,43 @@ static void *SessionRunningContext = &SessionRunningContext;
             }
           });
         }
-        complete:^(CaptureDelegate *delegate) {
+        complete:^(CaptureDelegate *delegate) {  // 촬영완료
           dispatch_async([Camera sessionQueue], ^{
+            // 촬영을 완료한 CaptureDelegate는 더 이상 필요없기 때문에 inProgressPhotoCaptureDelegates dictionary에서
+            // 제거한다.
             self.inProgressPhotoCaptureDelegates[@(delegate.requestedPhotoSettings.uniqueID)] = nil;
           });
         }];
+
+    // 생성된 CaptureDelegate를 strong하게 가지고 있기위해 inProgressPhotoCaptureDelegates dictionary에 저장한다.
     self.inProgressPhotoCaptureDelegates[@(captureDelegate.requestedPhotoSettings.uniqueID)] = captureDelegate;
+
+    // 캡쳐시작
     [self.photoOutput capturePhotoWithSettings:settings delegate:captureDelegate];
   });
 }
 
+// 비디오촬영 중 인지 확인
 - (BOOL)isRecording {
   return self.movieFileOutput.isRecording;
 }
 
+// 비디오촬영 시작
 - (void)startVideoRecording:(id<CameraCaptureUIDelegate>)uiDelegate complete:(void (^)(BOOL success))complete {
   NSAssert(uiDelegate, @"uiDelegate can't be nil");
-  
+
   _videoRecordingComplete = complete;
-  
+
+  // 현재 카메라화면의 오리엔테이션을 가져온다.
   AVCaptureVideoOrientation videoPreviewLayerVideoOrientation = [uiDelegate captureOrientation];
 
   dispatch_async([Camera sessionQueue], ^{
-    if (!self.movieFileOutput.isRecording) {  // 촬영중이 아니라면 촬영시작
-      if ([UIDevice currentDevice]
-              .isMultitaskingSupported) {  // 멀티태스킹지원시 백그라운드에서 동작할수있도록 백그라운드ID를 받는다.
+    if (!self.movieFileOutput.isRecording) {                   // 촬영중이 아니라면 촬영시작
+      if ([UIDevice currentDevice].isMultitaskingSupported) {  // 멀티태스킹지원시 백그라운드 설정
         self.backgroundRecordingID = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:nil];
       }
 
-      // 현재 비디오화면의 오리엔테이션으로 아웃푹오리엔테이션을 업데이트한다.
+      // 현재 비디오화면의 오리엔테이션 적용
       AVCaptureConnection *movieFileOutputConnection = [self.movieFileOutput connectionWithMediaType:AVMediaTypeVideo];
       movieFileOutputConnection.videoOrientation = videoPreviewLayerVideoOrientation;
 
@@ -204,53 +238,62 @@ static void *SessionRunningContext = &SessionRunningContext;
       NSString *outputFileName = [NSUUID UUID].UUIDString;
       NSString *outputFilePath = [NSTemporaryDirectory()
           stringByAppendingPathComponent:[outputFileName stringByAppendingPathExtension:@"mov"]];
+
+      // 비디오촬영 시작
       [self.movieFileOutput startRecordingToOutputFileURL:[NSURL fileURLWithPath:outputFilePath]
                                         recordingDelegate:self];
     }
   });
 }
 
+// 비디오촬영 종료
 - (void)stopVideoRecording {
-  if (self.movieFileOutput.isRecording) { // 촬영중이면 촬영종료
+  if (self.movieFileOutput.isRecording) {
     [self.movieFileOutput stopRecording];
   }
 }
 
 #pragma mark - AVCaptureFileOutputRecordingDelegate
+
+// 비디오촬영이 시작되면 호출되는 함수
 - (void)captureOutput:(AVCaptureFileOutput *)output
     didStartRecordingToOutputFileAtURL:(NSURL *)fileURL
                        fromConnections:(NSArray<AVCaptureConnection *> *)connections {
 }
 
+// 비디오촬영이 종료되면 호출되는 함수
 - (void)captureOutput:(AVCaptureFileOutput *)output
     didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL
                         fromConnections:(NSArray<AVCaptureConnection *> *)connections
                                   error:(nullable NSError *)error {
+  // 백그라운드 태스크 종료
   UIBackgroundTaskIdentifier currentBackgroundRecordingID = self.backgroundRecordingID;
   self.backgroundRecordingID = UIBackgroundTaskInvalid;
-  
-  // 촬영종료 후 초기화과정 (임시저장파일 삭제 및 백그라운드태스크 종료 블록)
+
+  // 촬영종료 후 초기화과정 블록 (임시저장파일 삭제 및 백그라운드가 종료되지 않은 경우 백그라운드태스크 종료)
   dispatch_block_t cleanUp = ^{
     if ([[NSFileManager defaultManager] fileExistsAtPath:outputFileURL.path]) {
       [[NSFileManager defaultManager] removeItemAtPath:outputFileURL.path error:NULL];
     }
-    
+
     if (currentBackgroundRecordingID != UIBackgroundTaskInvalid) {
       [[UIApplication sharedApplication] endBackgroundTask:currentBackgroundRecordingID];
     }
   };
-  
+
   BOOL success = YES;
-  if (error) { // 에러로 촬영종료 성공여부 확인
+  if (error) {  // 에러로 비디오촬영종료 성공여부 확인
     NSLog(@"Movie file finishing error: %@", error);
     success = [error.userInfo[AVErrorRecordingSuccessfullyFinishedKey] boolValue];
   }
-  
+
+  // 비디오촬영 성공여부 알림
   if (_videoRecordingComplete) {
     _videoRecordingComplete(success);
     _videoRecordingComplete = nil;
   }
-  if (success) { // 성공적으로 촬영이 종료되었다면 영상저장
+
+  if (success) {  // 성공적으로 촬영이 종료되었다면 영상저장
     [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {
       if (status == PHAuthorizationStatusAuthorized) {
         // Save the movie file to the photo library and cleanup.
@@ -260,12 +303,12 @@ static void *SessionRunningContext = &SessionRunningContext;
           PHAssetCreationRequest *creationRequest = [PHAssetCreationRequest creationRequestForAsset];
           [creationRequest addResourceWithType:PHAssetResourceTypeVideo fileURL:outputFileURL options:options];
         }
-                                          completionHandler:^(BOOL success, NSError *error) {
-                                            if (!success) {
-                                              NSLog(@"Could not save movie to photo library: %@", error);
-                                            }
-                                            cleanUp();
-                                          }];
+            completionHandler:^(BOOL success, NSError *error) {
+              if (!success) {
+                NSLog(@"Could not save movie to photo library: %@", error);
+              }
+              cleanUp();
+            }];
       } else {
         cleanUp();
       }
@@ -276,67 +319,50 @@ static void *SessionRunningContext = &SessionRunningContext;
 }
 
 #pragma mark - camera options
-- (void)switchCamera {
-  AVCaptureDevicePosition currentPosition = self.position;
-  if (currentPosition == AVCaptureDevicePositionBack) {
-    self.position = AVCaptureDevicePositionFront;
-  } else {
-    self.position = AVCaptureDevicePositionBack;
-  }
-}
 
-- (void)switchMode {
-  CameraMode currentMode = self.mode;
-  if (currentMode == CameraModePhoto) {
-    self.mode = CameraModeVideo;
-  } else {
-    self.mode = CameraModePhoto;
-  }
-}
-
-- (void)switchLivePhoto {
-  self.livePhotoEnable = !self.livePhotoEnable;
-}
-
-- (void)switchDepthDataDelivery {
-  self.depthDataDeliveryEnable = !self.depthDataDeliveryEnable;
-}
-
+// sync하게 카메라/비디오 모드 설정
 - (void)setMode:(CameraMode)mode {
   if (_mode != mode) {
     _mode = mode;
-    if (_mode == CameraModePhoto) {
-      [self.captureSession beginConfiguration];
-      [self.captureSession removeOutput:self.movieFileOutput];
-      self.captureSession.sessionPreset = AVCaptureSessionPresetPhoto;
+    if (_mode == CameraModePhoto) {                             // 카메라모드일때
+      [self.captureSession beginConfiguration];                 // 캡쳐세션 설정시작
+      [self.captureSession removeOutput:self.movieFileOutput];  // 비디오출력 제거
       self.movieFileOutput = nil;
-      if (self.photoOutput.livePhotoCaptureSupported) {
+
+      self.captureSession.sessionPreset = AVCaptureSessionPresetPhoto;  // 사진 프리셋 설정
+
+      if (self.photoOutput.livePhotoCaptureSupported) {  // 라이브포토가 되면 적용
         self.photoOutput.livePhotoCaptureEnabled = YES;
       }
 
-      if (@available(iOS 11.0, *)) {
+      if (@available(iOS 11.0, *)) {  // depthDataDelivery가 되면 적용
         if (self.photoOutput.depthDataDeliverySupported) {
           self.photoOutput.depthDataDeliveryEnabled = YES;
         }
       }
-      [self.captureSession commitConfiguration];
-    } else if (_mode == CameraModeVideo) {
-      AVCaptureMovieFileOutput *movieFileOutput = [[AVCaptureMovieFileOutput alloc] init];
-      if ([self.captureSession canAddOutput:movieFileOutput]) {
-        [self.captureSession beginConfiguration];
-        [self.captureSession addOutput:movieFileOutput];
+
+      [self.captureSession commitConfiguration];  // 캡쳐세션 설정 종료
+    } else if (_mode == CameraModeVideo) {        // 비디오모드일때
+      AVCaptureMovieFileOutput *movieFileOutput = [[AVCaptureMovieFileOutput alloc] init];  // 비디오출력 생성
+      if ([self.captureSession canAddOutput:movieFileOutput]) {  // 생성된 비디오출력을 캡쳐세션에 추가할 수 있으면
+        [self.captureSession beginConfiguration];         // 캡쳐 세션 설정 시작
+        [self.captureSession addOutput:movieFileOutput];  // 비디오출력 추가
+
+        // 비디오안정화?기능이 지원되면 적용
         AVCaptureConnection *connection = [movieFileOutput connectionWithMediaType:AVMediaTypeVideo];
         if (connection.isVideoStabilizationSupported) {
           connection.preferredVideoStabilizationMode = AVCaptureVideoStabilizationModeAuto;
         }
-        self.captureSession.sessionPreset = AVCaptureSessionPresetHigh;
-        [self.captureSession commitConfiguration];
-        self.movieFileOutput = movieFileOutput;
+
+        self.captureSession.sessionPreset = AVCaptureSessionPresetHigh;  // 비디오 프리셋 설정
+        [self.captureSession commitConfiguration];                       // 캡쳐세션 설정 종료
+        self.movieFileOutput = movieFileOutput;                          // 현재 비디오출력 업데이트
       }
     }
   }
 }
 
+// async하게 카메라/비디오 모드 설정
 - (void)setMode:(CameraMode)mode complete:(void (^)(void))complete {
   dispatch_async([Camera sessionQueue], ^{
     self.mode = mode;
@@ -344,13 +370,15 @@ static void *SessionRunningContext = &SessionRunningContext;
   });
 }
 
+// sync하게 카메라 전/후면 설정
 - (void)setPosition:(AVCaptureDevicePosition)position {
   if (_position != position) {
     _position = position;
-    [self configureCamera:nil];
+    [self configureCameraDevice:nil];
   }
 }
 
+// async하게 카메라 전/후면 설정
 - (void)setPosition:(AVCaptureDevicePosition)position complete:(void (^)(void))complete {
   dispatch_async([Camera sessionQueue], ^{
     self.position = position;
@@ -358,46 +386,23 @@ static void *SessionRunningContext = &SessionRunningContext;
   });
 }
 
-- (void)setFlash:(AVCaptureFlashMode)flash {
-  if (_flash != flash) {
-    _flash = flash;
-  }
-}
-
 - (void)setLivePhotoEnable:(BOOL)livePhotoEnable {
-  [self setLivePhotoEnable:livePhotoEnable complete:nil];
-}
-
-- (void)setLivePhotoEnable:(BOOL)livePhotoEnable complete:(void (^)(void))complete {
   if (_livePhotoEnable != livePhotoEnable) {
-    // livePhoto 지원이 안되는데 livePhoto를 활성화할 경우 예외처리
+    // livePhoto 지원이 안되는데 활성화할 경우 예외처리
     if (!self.photoOutput.livePhotoCaptureSupported && livePhotoEnable) return;
-
     _livePhotoEnable = livePhotoEnable;
-    dispatch_async([Camera sessionQueue], ^{
-      if (complete) complete();
-    });
   }
 }
 
 - (void)setDepthDataDeliveryEnable:(BOOL)depthDataDeliveryEnable {
-  [self setDepthDataDeliveryEnable:depthDataDeliveryEnable complete:nil];
-}
-
-- (void)setDepthDataDeliveryEnable:(BOOL)depthDataDeliveryEnable complete:(void (^)(void))complete {
   if (@available(iOS 11.0, *)) {
     if (_depthDataDeliveryEnable != depthDataDeliveryEnable) {
-      // depthDataDelivery 지원이 안되는데 deptheDataDelivery를 활성화할 경우
-      // 예외처리
-
+      // depthDataDelivery 지원이 안되는데 활성화할 경우 예외처리
       if (!self.photoOutput.depthDataDeliverySupported && depthDataDeliveryEnable) return;
-
       _depthDataDeliveryEnable = depthDataDeliveryEnable;
-      dispatch_async([Camera sessionQueue], ^{
-        self.photoOutput.depthDataDeliveryEnabled = depthDataDeliveryEnable;
-        if (complete) complete();
-      });
     }
+  } else {
+    _depthDataDeliveryEnable = NO;
   }
 }
 
@@ -429,17 +434,11 @@ static void *SessionRunningContext = &SessionRunningContext;
   if (!_photoOutput) {
     _photoOutput = [[AVCapturePhotoOutput alloc] init];
     _photoOutput.highResolutionCaptureEnabled = YES;
-    _photoOutput.livePhotoCaptureEnabled = _photoOutput.livePhotoCaptureSupported;
-    if (@available(iOS 11.0, *)) {
-      _photoOutput.depthDataDeliveryEnabled = _photoOutput.depthDataDeliverySupported;
-    } else {
-      _depthDataDeliveryEnable = NO;
-    }
   }
   return _photoOutput;
 }
 
-- (BOOL)configureCamera:(NSError **)error {
+- (BOOL)configureCameraDevice:(NSError **)error {
   AVCaptureDeviceType deviceType;
   if (_position == AVCaptureDevicePositionFront) {
     deviceType = AVCaptureDeviceTypeBuiltInWideAngleCamera;
@@ -484,6 +483,16 @@ static void *SessionRunningContext = &SessionRunningContext;
       } else {
         [self.captureSession commitConfiguration];
         return NO;
+      }
+
+      AVCaptureConnection *movieFileOutputConnection = [self.movieFileOutput connectionWithMediaType:AVMediaTypeVideo];
+      if (movieFileOutputConnection.isVideoStabilizationSupported) {
+        movieFileOutputConnection.preferredVideoStabilizationMode = AVCaptureVideoStabilizationModeAuto;
+      }
+
+      self.photoOutput.livePhotoCaptureEnabled = self.photoOutput.livePhotoCaptureSupported;
+      if (@available(iOS 11.0, *)) {
+        self.photoOutput.depthDataDeliveryEnabled = self.photoOutput.depthDataDeliverySupported;
       }
 
       [self.captureSession commitConfiguration];
@@ -545,6 +554,5 @@ static void *SessionRunningContext = &SessionRunningContext;
   
   return setting;
 }
-
 
 @end

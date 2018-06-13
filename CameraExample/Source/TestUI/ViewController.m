@@ -250,16 +250,8 @@
                       });
                     }];
   } else if (sender == self.livePhotoButton) {
-    [self showCameraPreview:NO];
-    __block typeof(self) blockSelf = self;
-    [self.camera setLivePhotoEnable:!self.camera.livePhotoEnable
-                           complete:^{
-                             dispatch_async(dispatch_get_main_queue(), ^{
-                               NSLog(@"dbtest livePhoto:%@", blockSelf.camera.livePhotoEnable ? @"Enable" : @"Disable");
-                               blockSelf.livePhotoButton.selected = blockSelf.camera.livePhotoEnable;
-                               [blockSelf showCameraPreview:YES];
-                             });
-                           }];
+    [self.camera setLivePhotoEnable:!self.camera.livePhotoEnable];
+    self.livePhotoButton.selected = self.camera.livePhotoEnable;
   } else if (sender == self.flashButton) {
   } else if (sender == self.focusModeButton) {
   } else if (sender == self.exposureModeButton) {

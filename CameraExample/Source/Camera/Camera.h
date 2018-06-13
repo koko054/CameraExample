@@ -118,7 +118,7 @@ typedef NS_ENUM(NSInteger, CameraMode) {
  비디오촬영
 
  @param uiDelegate <CameraCaptureUIDelegate> 딜리게이트
- @param complete 촬영종료되면 실행되는 블록
+ @param complete 촬영종료되면 실행되는 Block
  @see stopVideoRecording
  */
 - (void)startVideoRecording:(id<CameraCaptureUIDelegate>)uiDelegate complete:(void (^)(BOOL success))complete;
@@ -132,32 +132,47 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 #pragma mark - camera options
 
 /**
- 전/후면 camera position toggle
- */
-- (void)switchCamera;
+ sync하게 사진/비디오 모드 설정 (UI가 잠깐 멈추거나 카메라화면이 깜빡이는 현상이 일어날수있다.)
 
-/**
- 사진/비디오 modo toggle
+ @param mode 사진:CameraModePhoto, 비디오:CameraModeVideo
  */
-- (void)switchMode;
-
-/**
- livePhoto on/off toggle
- */
-- (void)switchLivePhoto;
-
-/**
- depthDataDelivery on/off toggle
- */
-- (void)switchDepthDataDelivery;
-
 - (void)setMode:(CameraMode)mode;
+
+/**
+ async하게 사진/비디오 모드 설정 (카메라화면이 깜빡이는 현상이 일어날수있다.)
+
+ @param mode 사진:CameraModePhoto, 비디오:CameraModeVideo
+ @param complete 설정이 완료되면 실행되는 Block
+ */
 - (void)setMode:(CameraMode)mode complete:(void (^)(void))complete;
+
+/**
+ sync하게 카메라 전/후면 설정 (UI가 잠깐 멈추거나 카메라화면이 깜빡이는 현상이 일어날수있다.)
+
+ @param position 전면:AVCaptureDevicePositionFront, 후면:AVCaptureDevicePositionBack
+ */
 - (void)setPosition:(AVCaptureDevicePosition)position;
+
+/**
+ async하게 카메라 전/후면 설정 (카메라화면이 깜빡이는 현상이 일어날수있다.)
+
+ @param position 전면:AVCaptureDevicePositionFront, 후면:AVCaptureDevicePositionBack
+ @param complete 설정이 완료되면 실행되는 Block
+ */
 - (void)setPosition:(AVCaptureDevicePosition)position complete:(void (^)(void))complete;
+
+/**
+ 라이브포토 활성화/비활성화
+
+ @param livePhotoEnable 활성화:YES, 비활성화:NO
+ */
 - (void)setLivePhotoEnable:(BOOL)livePhotoEnable;
-- (void)setLivePhotoEnable:(BOOL)livePhotoEnable complete:(void (^)(void))complete;
+
+/**
+ depthDataDelivery 활성화/비활성화 (iOS11 이상만 활성화 가능)
+
+ @param depthDataDeliveryEnable 활성화:YES, 비활성화:NO
+ */
 - (void)setDepthDataDeliveryEnable:(BOOL)depthDataDeliveryEnable;
-- (void)setDepthDataDeliveryEnable:(BOOL)depthDataDeliveryEnable complete:(void (^)(void))complete;
 
 @end

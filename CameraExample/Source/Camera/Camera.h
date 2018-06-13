@@ -26,22 +26,29 @@ typedef NS_ENUM(NSInteger, CameraMode) {
   CameraModeCount
 };
 
+@protocol CameraCaptureUIDelegate<NSObject>
+@required
+- (AVCaptureVideoOrientation)captureOrientation;
+@optional
+- (void (^)(void))captureAnimation;
+- (void)capturingLivePhoto:(BOOL)capturing;
+@end
+
 @interface Camera : NSObject
 
 @property(nonatomic, assign, readonly) CameraMode mode;
 @property(nonatomic, assign, readonly) AVCaptureDevicePosition position;
 @property(nonatomic, assign, readonly) AVCaptureFlashMode flash;
-@property(nonatomic, assign, readonly) BOOL livePhotoSupported;
 @property(nonatomic, assign, readonly) BOOL livePhotoEnable;
-@property(nonatomic, assign, readonly) BOOL depthDataDeliverySupported;
 @property(nonatomic, assign, readonly) BOOL depthDataDeliveryEnable;
-
 
 /**
  Camera 객체를 async하게 생성한다.
- 기본적으로 mode는 CameraModePhoto, posotion은 AVCaptureDevicePositionBack으로 설정된다.
+ 기본적으로 mode는 CameraModePhoto, posotion은 AVCaptureDevicePositionBack으로
+ 설정된다.
 
- @param complete Camera * 생성된 객체 생성실패 시 null , NSError * 생성필패 시 에러
+ @param complete Camera * 생성된 객체 생성실패 시 null , NSError * 생성필패 시
+ 에러
  */
 + (void)configureCamera:(void (^)(Camera *camera, NSError *error))complete;
 
@@ -50,7 +57,8 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 
  @param mode 초기 카메라모드
  @param position 초기 카메라 위치 (전/후면카메라)
- @param complete Camera * : 생성된 객체 생성실패 시 null , NSError * : 생성필패 시 에러
+ @param complete Camera * : 생성된 객체 생성실패 시 null , NSError * : 생성필패
+ 시 에러
  */
 + (void)congifureCameraWithMode:(CameraMode)mode
                        position:(AVCaptureDevicePosition)position
@@ -74,7 +82,8 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 - (instancetype)initWithMode:(CameraMode)mode position:(AVCaptureDevicePosition)position error:(NSError **)error;
 
 /**
- 현재 캡쳐세션 AVCaptureVideoPreviewLayer의 session으로 설정하면 해당 Layer에 캡쳐한 영상이 나온다.
+ 현재 캡쳐세션 AVCaptureVideoPreviewLayer의 session으로 설정하면 해당 Layer에
+ 캡쳐한 영상이 나온다.
  */
 - (AVCaptureSession *)session;
 
@@ -94,9 +103,31 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 - (void)stopCapture;
 
 /**
- 사진모드 : 사진촬영 / 비디오모드 : 캡쳐
+ 사진촬영 또는 라이브포토촬영(livePhotoEnable을 YES설정시)
  */
-- (void)capturePhoto:(void (^)(UIImage *photo))complete;
+- (void)takePhotoWithDelegate:(id<CameraCaptureUIDelegate>)uiDelegate complete:(void (^)(void))complete;
+
+/**
+ 비디오촬영중인지 확인하는 기능
+
+ @return 비디오촬영중 YES, 아니면 NO
+ */
+- (BOOL)isRecording;
+
+/**
+ 비디오촬영
+
+ @param uiDelegate <CameraCaptureUIDelegate> 딜리게이트
+ @param complete 촬영종료되면 실행되는 블록
+ @see stopVideoRecording
+ */
+- (void)startVideoRecording:(id<CameraCaptureUIDelegate>)uiDelegate complete:(void (^)(BOOL success))complete;
+
+/**
+ 촬영종료
+ @see startVideoRecording:complete
+ */
+- (void)stopVideoRecording;
 
 #pragma mark - camera options
 
@@ -125,6 +156,8 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 - (void)setPosition:(AVCaptureDevicePosition)position;
 - (void)setPosition:(AVCaptureDevicePosition)position complete:(void (^)(void))complete;
 - (void)setLivePhotoEnable:(BOOL)livePhotoEnable;
+- (void)setLivePhotoEnable:(BOOL)livePhotoEnable complete:(void (^)(void))complete;
 - (void)setDepthDataDeliveryEnable:(BOOL)depthDataDeliveryEnable;
+- (void)setDepthDataDeliveryEnable:(BOOL)depthDataDeliveryEnable complete:(void (^)(void))complete;
 
 @end

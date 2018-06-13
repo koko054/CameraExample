@@ -45,5 +45,9 @@
 	<string>test</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>test</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>test</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>test</string>
 </dict>
 </plist>

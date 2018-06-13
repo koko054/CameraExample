@@ -115,6 +115,13 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 - (BOOL)isRecording;
 
 /**
+ 비디오촬영 중 사진 스냅샷이 가능한지 확인
+ 
+ @return 스냅샷 가능:YES, 불가능:NO
+ */
+- (BOOL)availableSnapShot;
+
+/**
  비디오촬영
 
  @param uiDelegate <CameraCaptureUIDelegate> 딜리게이트

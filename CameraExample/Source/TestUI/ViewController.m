@@ -29,11 +29,12 @@
 @property(nonatomic, strong) UIView *buttonPanel;
 @property(nonatomic, strong) UIButton *captureButton;
 @property(nonatomic, strong) UIButton *cameraModeButton;
-@property(nonatomic, strong) UIButton *rotateButton;
+@property(nonatomic, strong) UIButton *snapShotButton;
 @property(nonatomic, strong) UIButton *livePhotoButton;
 @property(nonatomic, strong) UIButton *flashButton;
 @property(nonatomic, strong) UIButton *focusModeButton;
 @property(nonatomic, strong) UIButton *exposureModeButton;
+@property(nonatomic, strong) UIButton *rotateButton;
 
 @property(nonatomic, assign) CGFloat videoRecordingTime;
 
@@ -48,11 +49,12 @@
   [self.view addSubview:self.buttonPanel];
   [self.buttonPanel addSubview:self.captureButton];
   [self.buttonPanel addSubview:self.cameraModeButton];
-  [self.buttonPanel addSubview:self.rotateButton];
+  [self.buttonPanel addSubview:self.snapShotButton];
   [self.buttonPanel addSubview:self.livePhotoButton];
   [self.buttonPanel addSubview:self.flashButton];
   [self.buttonPanel addSubview:self.focusModeButton];
   [self.buttonPanel addSubview:self.exposureModeButton];
+  [self.buttonPanel addSubview:self.rotateButton];
 
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(applicationWillEnterForeground)
@@ -155,13 +157,12 @@
   return _cameraModeButton;
 }
 
-- (UIButton *)rotateButton {
-  if (!_rotateButton) {
-    _rotateButton = [self testButtonRow:0 column:2];
-    [_rotateButton setTitle:@"후면" forState:UIControlStateNormal];
-    [_rotateButton setTitle:@"전면" forState:UIControlStateSelected];
+- (UIButton *)snapShotButton {
+  if (!_snapShotButton) {
+    _snapShotButton = [self testButtonRow:0 column:2];
+    [_snapShotButton setTitle:@"snap\nshot" forState:UIControlStateNormal];
   }
-  return _rotateButton;
+  return _snapShotButton;
 }
 
 - (UIButton *)livePhotoButton {
@@ -195,6 +196,15 @@
     [_exposureModeButton setTitle:@"자동밝기" forState:UIControlStateNormal];
   }
   return _exposureModeButton;
+}
+
+- (UIButton *)rotateButton {
+  if (!_rotateButton) {
+    _rotateButton = [self testButtonRow:1 column:3];
+    [_rotateButton setTitle:@"후면" forState:UIControlStateNormal];
+    [_rotateButton setTitle:@"전면" forState:UIControlStateSelected];
+  }
+  return _rotateButton;
 }
 
 - (void)touchedUpButtons:(UIButton *)sender {
@@ -273,6 +283,12 @@
     [self.camera setFlash:nextFlash];
   } else if (sender == self.focusModeButton) {
   } else if (sender == self.exposureModeButton) {
+  } else if (sender == self.snapShotButton) {
+    if (self.camera.isRecording && self.camera.availableSnapShot) {
+      [self.camera takePhotoWithDelegate:self complete:^{
+        NSLog(@"dbtest take snap shot");
+      }];
+    }
   }
 }
 

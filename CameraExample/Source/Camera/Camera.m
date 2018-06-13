@@ -8,6 +8,8 @@
 
 #import "Camera.h"
 #import "CaptureDelegate.h"
+#import "AVCaptureDeviceDiscoverySession+Utilities.h"
+
 #import <UIKit/UIKit.h>
 
 @import Photos;
@@ -203,6 +205,11 @@ static void *SessionRunningContext = &SessionRunningContext;
 // 비디오촬영 중 인지 확인
 - (BOOL)isRecording {
   return self.movieFileOutput.isRecording;
+}
+
+// 비디오촬영 중 스냅샷이 가능한지 확인
+- (BOOL)availableSnapShot {
+  return (self.cameraDiscoverySession.uniqueDevicePositionsCount > 1);
 }
 
 // 비디오촬영 시작

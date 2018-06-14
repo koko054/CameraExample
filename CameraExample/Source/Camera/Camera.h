@@ -32,6 +32,7 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 @optional
 - (void (^)(void))captureAnimation;
 - (void)capturingLivePhoto:(BOOL)capturing;
+
 @end
 
 @interface Camera : NSObject
@@ -188,5 +189,12 @@ typedef NS_ENUM(NSInteger, CameraMode) {
  @param depthDataDeliveryEnable 활성화:YES, 비활성화:NO
  */
 - (void)setDepthDataDeliveryEnable:(BOOL)depthDataDeliveryEnable;
+
+/**
+ 입력된 포인터로 포커스와 밝기를 자동으로 맞춘다.
+
+ @param point x:0.0~1.0 / y:0.0~1.0
+ */
+- (void)setFocusExposurePoint:(CGPoint)point;
 
 @end

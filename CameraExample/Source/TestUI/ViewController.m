@@ -110,8 +110,17 @@
     _previewView.backgroundColor = UIColor.blackColor;
     _previewView.videoPreviewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
     _previewView.alpha = 0.0;
+    UITapGestureRecognizer *tap =
+        [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTapCameraPreviewView:)];
+    [_previewView addGestureRecognizer:tap];
   }
   return _previewView;
+}
+
+- (void)handleTapCameraPreviewView:(UITapGestureRecognizer *)gesture {
+  CGPoint devicePoint =
+      [self.previewView.videoPreviewLayer captureDevicePointOfInterestForPoint:[gesture locationInView:gesture.view]];
+  [self.camera setFocusExposurePoint:devicePoint];
 }
 
 - (UIView *)buttonPanel {

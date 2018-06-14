@@ -9,27 +9,29 @@
 #import "Camera.h"
 #import "CaptureDelegate.h"
 #import "AVCaptureDeviceDiscoverySession+Utilities.h"
-
 #import <UIKit/UIKit.h>
 
 @import Photos;
 
-static void *SessionRunningContext = &SessionRunningContext;
+#define USE_INTERRUPTION_NOTIFICATION 0
 
 @interface Camera ()<AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureFileOutputRecordingDelegate>
 
-@property(nonatomic, strong) AVCaptureDeviceDiscoverySession *cameraDiscoverySession;
-@property(nonatomic, strong) AVCaptureSession *captureSession;
-@property(nonatomic, strong) AVCaptureDevice *cameraDevice;
-@property(nonatomic, strong) AVCaptureDeviceInput *videoInput;
-@property(nonatomic, strong) AVCapturePhotoOutput *photoOutput;
+@property(nonatomic, assign) BOOL sessionRunning; // 캡쳐세션이 에러로 멈췄을때 다시 시작할지 판단하기위한 플래그
+@property(nonatomic, strong) AVCaptureDeviceDiscoverySession *cameraDiscoverySession; // 현재 카메라디바이스를 찾기위한 세션
+@property(nonatomic, strong) AVCaptureSession *captureSession; // 카메라 캡쳐세션
+@property(nonatomic, strong) AVCaptureDevice *cameraDevice; //
+@property(nonatomic, strong) AVCaptureDeviceInput *videoInput; // 비디오 영상 입력
+@property(nonatomic, strong) AVCapturePhotoOutput *photoOutput; // 사진,라이브포토 출력
 
+// 사진,포토라이브러리 캡쳐 관리
 @property(nonatomic) NSMutableDictionary<NSNumber *, CaptureDelegate *> *inProgressPhotoCaptureDelegates;
 @property(nonatomic) NSInteger inProgressLivePhotoCapturesCount;
 
-@property(nonatomic, copy) void (^videoRecordingComplete)(BOOL success);
-@property(nonatomic, strong) AVCaptureMovieFileOutput *movieFileOutput;
-@property(nonatomic, assign) UIBackgroundTaskIdentifier backgroundRecordingID;
+@property(nonatomic, copy) void (^videoRecordingComplete)(BOOL success); // 비디오 촬영 완료 블럭
+@property(nonatomic, strong) AVCaptureMovieFileOutput *movieFileOutput; // 비디오 출력
+
+@property(nonatomic, assign) UIBackgroundTaskIdentifier backgroundRecordingID; // 백그라운드 태스크 관리
 
 @end
 
@@ -144,11 +146,13 @@ static void *SessionRunningContext = &SessionRunningContext;
 // 캡쳐세션 시작
 - (void)startCapture {
   [self.captureSession startRunning];
+  self.sessionRunning = self.captureSession.isRunning;
 }
 
 // 캡쳐세션 중지
 - (void)stopCapture {
   [self.captureSession stopRunning];
+  self.sessionRunning = self.captureSession.isRunning;
 }
 
 // 사진/라이브포토 촬영
@@ -420,6 +424,43 @@ static void *SessionRunningContext = &SessionRunningContext;
   }
 }
 
+- (void)setFocusExposurePoint:(CGPoint)point {
+  [self focusWithMode:AVCaptureFocusModeAutoFocus
+                exposeWithMode:AVCaptureExposureModeAutoExpose
+                 atDevicePoint:point
+      monitorSubjectAreaChange:YES];
+}
+
+- (void)focusWithMode:(AVCaptureFocusMode)focusMode
+              exposeWithMode:(AVCaptureExposureMode)exposureMode
+               atDevicePoint:(CGPoint)point
+    monitorSubjectAreaChange:(BOOL)monitorSubjectAreaChange {
+  dispatch_async([Camera sessionQueue], ^{
+    AVCaptureDevice *device = self.videoInput.device;
+    NSError *error = nil;
+    if ([device lockForConfiguration:&error]) {
+      /*
+       Setting (focus/exposure)PointOfInterest alone does not initiate a (focus/exposure) operation.
+       Call set(Focus/Exposure)Mode() to apply the new point of interest.
+       */
+      if (device.isFocusPointOfInterestSupported && [device isFocusModeSupported:focusMode]) {
+        device.focusPointOfInterest = point;
+        device.focusMode = focusMode;
+      }
+
+      if (device.isExposurePointOfInterestSupported && [device isExposureModeSupported:exposureMode]) {
+        device.exposurePointOfInterest = point;
+        device.exposureMode = exposureMode;
+      }
+
+      device.subjectAreaChangeMonitoringEnabled = monitorSubjectAreaChange;
+      [device unlockForConfiguration];
+    } else {
+      NSLog(@"Could not lock device for configuration: %@", error);
+    }
+  });
+}
+
 #pragma mark - private functions
 - (AVCaptureDeviceFormat *)currentFormat {
   return self.cameraDevice.activeFormat;
@@ -565,8 +606,73 @@ static void *SessionRunningContext = &SessionRunningContext;
       setting.depthDataDeliveryEnabled = NO;
     }
   }
-  
+
   return setting;
 }
+
+#pragma mark KVO and Notifications
+
+- (void)addObservers {
+  // 카메라화면에 많은 변화가 생기면 호출되는 노티피케이션 등록
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(subjectAreaDidChange:)
+                                               name:AVCaptureDeviceSubjectAreaDidChangeNotification
+                                             object:self.videoInput.device];
+
+  // 캡쳐세션에 에러발생 시 호출되는 노티피케이션 등록
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(sessionRuntimeError:)
+                                               name:AVCaptureSessionRuntimeErrorNotification
+                                             object:self.captureSession];
+
+#if USE_INTERRUPTION_NOTIFICATION
+  // 캡쳐세션에 인터럽트가 걸리면 호출되는 노티피케이션 등록
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(captureSessionWasInterrupted:)
+                                               name:AVCaptureSessionWasInterruptedNotification
+                                             object:self.captureSession];
+  
+  // 캡쳐세션 인터럽트가 끝나면 호출되는 노티피케이션 등록
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(captureSessionInterruptionEnded:)
+                                               name:AVCaptureSessionInterruptionEndedNotification
+                                             object:self.captureSession];
+#endif
+}
+
+- (void)removeObservers {
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)sessionRuntimeError:(NSNotification *)notification { // 캡쳐세션 에러발생 시
+  NSError *error = notification.userInfo[AVCaptureSessionErrorKey];
+  NSLog(@"Capture session runtime error: %@", error);
+  
+  if (error.code == AVErrorMediaServicesWereReset) { // 미디어서비스가 리셋된경우
+    dispatch_async([Camera sessionQueue], ^{
+      if (self.sessionRunning) { // 기존 캡쳐세션이 작동하기 있었으면 다시 시작
+        [self.captureSession startRunning];
+        self.sessionRunning = self.captureSession.isRunning;
+      }
+    });
+  }
+}
+
+- (void)subjectAreaDidChange:(NSNotification *)notification { // 카메라화면에 많은 변화가 있으면 다시 포커스와 밝기를 맞춘다.
+  [self focusWithMode:AVCaptureFocusModeAutoFocus
+       exposeWithMode:AVCaptureExposureModeAutoExpose
+        atDevicePoint:CGPointMake(0.5, 0.5)
+monitorSubjectAreaChange:NO];
+}
+
+#if USE_INTERRUPTION_NOTIFICATION
+- (void)captureSessionWasInterrupted:(NSNotification *)notification {
+  
+}
+
+- (void)captureSessionInterruptionEnded:(NSNotification *)notification {
+  
+}
+#endif
 
 @end

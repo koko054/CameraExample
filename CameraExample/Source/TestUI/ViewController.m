@@ -291,12 +291,14 @@
     }
     [self.camera setFlash:nextFlash];
   } else if (sender == self.focusModeButton) {
+    self.camera.rawDataEnable = YES;
   } else if (sender == self.exposureModeButton) {
   } else if (sender == self.snapShotButton) {
     if (self.camera.isRecording && self.camera.availableSnapShot) {
-      [self.camera takePhotoWithDelegate:self complete:^{
-        NSLog(@"dbtest take snap shot");
-      }];
+      [self.camera takePhotoWithDelegate:self
+                                complete:^{
+                                  NSLog(@"dbtest take snap shot");
+                                }];
     }
   }
 }
@@ -322,7 +324,23 @@
 }
 
 - (void)capturingLivePhoto:(BOOL)capturing {
-  NSLog(@"dbtest livePhoto capturing : %@",capturing ? @"YES" : @"NO");
+  NSLog(@"dbtest livePhoto capturing : %@", capturing ? @"YES" : @"NO");
+}
+
+- (NSString *)stringOfCameraMode:(CameraMode)cameraMode {
+  NSString *string;
+  switch (cameraMode) {
+    case CameraModePhoto:
+      string = @"Photo";
+      break;
+    case CameraModeVideo:
+      string = @"Video";
+      break;
+    default:
+      string = @"Unknown";
+      break;
+  }
+  return string;
 }
 
 @end

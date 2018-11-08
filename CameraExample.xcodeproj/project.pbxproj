@@ -71,6 +71,8 @@
 				7A8CFC8820AFD4240051F1D0 /* Camera.m */,
 				7A476DF420B0675100B668C5 /* CaptureDelegate.h */,
 				7A476DF520B0675100B668C5 /* CaptureDelegate.m */,
+				7A1FB90720AFEE2B00DDA9AA /* AVCaptureDeviceDiscoverySession+Utilities.h */,
+				7A1FB90820AFEE2B00DDA9AA /* AVCaptureDeviceDiscoverySession+Utilities.m */,
 			);
 			path = Camera;
 			sourceTree = "<group>";
@@ -123,8 +125,6 @@
 		7A8CFC8620AFD2350051F1D0 /* Source */ = {
 			isa = PBXGroup;
 			children = (
-				7A1FB90720AFEE2B00DDA9AA /* AVCaptureDeviceDiscoverySession+Utilities.h */,
-				7A1FB90820AFEE2B00DDA9AA /* AVCaptureDeviceDiscoverySession+Utilities.m */,
 				7A1FB90E20B03F9700DDA9AA /* Camera */,
 				7A1FB90D20B03F8000DDA9AA /* TestUI */,
 			);
@@ -348,7 +348,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 277FZP57A3;
+				DEVELOPMENT_TEAM = F5T39455QV;
 				INFOPLIST_FILE = CameraExample/Supports/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 10.2;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -357,7 +357,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.dobumkim.CameraExample;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -366,7 +366,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 277FZP57A3;
+				DEVELOPMENT_TEAM = F5T39455QV;
 				INFOPLIST_FILE = CameraExample/Supports/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 10.2;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -375,7 +375,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.dobumkim.CameraExample;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};

@@ -17,21 +17,22 @@
 
 @interface Camera ()<AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureFileOutputRecordingDelegate>
 
-@property(nonatomic, assign) BOOL sessionRunning; // 캡쳐세션이 에러로 멈췄을때 다시 시작할지 판단하기위한 플래그
-@property(nonatomic, strong) AVCaptureDeviceDiscoverySession *cameraDiscoverySession; // 현재 카메라디바이스를 찾기위한 세션
-@property(nonatomic, strong) AVCaptureSession *captureSession; // 카메라 캡쳐세션
-@property(nonatomic, strong) AVCaptureDevice *cameraDevice; //
-@property(nonatomic, strong) AVCaptureDeviceInput *videoInput; // 비디오 영상 입력
-@property(nonatomic, strong) AVCapturePhotoOutput *photoOutput; // 사진,라이브포토 출력
+@property(nonatomic, assign) BOOL sessionRunning;  // 캡쳐세션이 에러로 멈췄을때 다시 시작할지 판단하기위한 플래그
+@property(nonatomic, strong)
+    AVCaptureDeviceDiscoverySession *cameraDiscoverySession;     // 현재 카메라디바이스를 찾기위한 세션
+@property(nonatomic, strong) AVCaptureSession *captureSession;   // 카메라 캡쳐세션
+@property(nonatomic, strong) AVCaptureDevice *cameraDevice;      //
+@property(nonatomic, strong) AVCaptureDeviceInput *videoInput;   // 비디오 영상 입력
+@property(nonatomic, strong) AVCapturePhotoOutput *photoOutput;  // 사진,라이브포토 출력
 
 // 사진,포토라이브러리 캡쳐 관리
 @property(nonatomic) NSMutableDictionary<NSNumber *, CaptureDelegate *> *inProgressPhotoCaptureDelegates;
 @property(nonatomic) NSInteger inProgressLivePhotoCapturesCount;
 
-@property(nonatomic, copy) void (^videoRecordingComplete)(BOOL success); // 비디오 촬영 완료 블럭
-@property(nonatomic, strong) AVCaptureMovieFileOutput *movieFileOutput; // 비디오 출력
+@property(nonatomic, copy) void (^videoRecordingComplete)(BOOL success);  // 비디오 촬영 완료 블럭
+@property(nonatomic, strong) AVCaptureMovieFileOutput *movieFileOutput;   // 비디오 출력
 
-@property(nonatomic, assign) UIBackgroundTaskIdentifier backgroundRecordingID; // 백그라운드 태스크 관리
+@property(nonatomic, assign) UIBackgroundTaskIdentifier backgroundRecordingID;  // 백그라운드 태스크 관리
 
 @end
 
@@ -82,8 +83,11 @@
     _mode = mode;
     _position = position;
     _flash = AVCaptureFlashModeAuto;
+    _focus = AVCaptureFocusModeContinuousAutoFocus;
+    _exposure = AVCaptureExposureModeAutoExpose;
     _livePhotoEnable = NO;
     _depthDataDeliveryEnable = NO;
+    _portraitEffectsMatteEnable = NO;
 
     // 카메라모드에 따라 프리셋설정
     AVCaptureSessionPreset preset = mode == CameraModePhoto ? AVCaptureSessionPresetPhoto : AVCaptureSessionPresetHigh;
@@ -111,7 +115,9 @@
       if (@available(iOS 11.0, *)) {
         self.photoOutput.depthDataDeliveryEnabled = self.photoOutput.depthDataDeliverySupported;
       }
-
+      if (@available(iOS 12.0, *)) {
+        self.photoOutput.portraitEffectsMatteDeliveryEnabled = self.photoOutput.portraitEffectsMatteDeliverySupported;
+      }
     } else {
       [self.captureSession commitConfiguration];
       return nil;
@@ -343,12 +349,24 @@
       self.captureSession.sessionPreset = AVCaptureSessionPresetPhoto;  // 사진 프리셋 설정
 
       if (self.photoOutput.livePhotoCaptureSupported) {  // 라이브포토가 되면 적용
-        self.photoOutput.livePhotoCaptureEnabled = YES;
+        self.photoOutput.livePhotoCaptureEnabled = self.livePhotoEnable;
+      } else {
+        self.photoOutput.livePhotoCaptureEnabled = NO;
       }
 
       if (@available(iOS 11.0, *)) {  // depthDataDelivery가 되면 적용
         if (self.photoOutput.depthDataDeliverySupported) {
-          self.photoOutput.depthDataDeliveryEnabled = YES;
+          self.photoOutput.depthDataDeliveryEnabled = self.depthDataDeliveryEnable;
+        } else {
+          self.photoOutput.depthDataDeliveryEnabled = NO;
+        }
+      }
+
+      if (@available(iOS 12.0, *)) {
+        if (self.photoOutput.portraitEffectsMatteDeliverySupported) {
+          self.photoOutput.portraitEffectsMatteDeliveryEnabled = self.portraitEffectsMatteEnable;
+        } else {
+          self.photoOutput.portraitEffectsMatteDeliveryEnabled = NO;
         }
       }
 
@@ -404,6 +422,19 @@
   }
 }
 
+// focus 설정
+- (void)setFocus:(AVCaptureFocusMode)focus {
+  if (_focus != focus) {
+    _focus = focus;
+  }
+}
+
+- (void)setExposure:(AVCaptureExposureMode)exposure {
+  if (_exposure != exposure) {
+    _exposure = exposure;
+  }
+}
+
 - (void)setLivePhotoEnable:(BOOL)livePhotoEnable {
   if (_livePhotoEnable != livePhotoEnable) {
     // livePhoto 지원이 안되는데 활성화할 경우 예외처리
@@ -421,6 +452,26 @@
     }
   } else {
     _depthDataDeliveryEnable = NO;
+  }
+}
+
+- (void)setPortraitEffectsMatteEnable:(BOOL)portraitEffectsMatteEnable {
+  if (@available(iOS 12.0, *)) {
+    if (_portraitEffectsMatteEnable != portraitEffectsMatteEnable) {
+      // portraitEffectsMatteEnable 지원이 안되는데 활성화할 경우 예외처리
+      if ((!self.photoOutput.portraitEffectsMatteDeliverySupported || !self.depthDataDeliveryEnable) &&
+          portraitEffectsMatteEnable)
+        return;
+      _portraitEffectsMatteEnable = portraitEffectsMatteEnable;
+    }
+  } else {
+    _portraitEffectsMatteEnable = NO;
+  }
+}
+
+- (void)setRawDataEnable:(BOOL)rawDataEnable {
+  if (_rawDataEnable != rawDataEnable) {
+    _rawDataEnable = rawDataEnable;
   }
 }
 
@@ -468,8 +519,15 @@
 
 - (AVCaptureDeviceDiscoverySession *)cameraDiscoverySession {
   if (!_cameraDiscoverySession) {
-    NSArray<AVCaptureDeviceType> *deviceTypes =
-        @[ AVCaptureDeviceTypeBuiltInWideAngleCamera, AVCaptureDeviceTypeBuiltInDualCamera ];
+    NSArray<AVCaptureDeviceType> *deviceTypes;
+    if (@available(iOS 11.1, *)) {
+      deviceTypes = @[
+        AVCaptureDeviceTypeBuiltInWideAngleCamera, AVCaptureDeviceTypeBuiltInDualCamera,
+        AVCaptureDeviceTypeBuiltInTrueDepthCamera
+      ];
+    } else {
+      deviceTypes = @[ AVCaptureDeviceTypeBuiltInWideAngleCamera, AVCaptureDeviceTypeBuiltInDualCamera ];
+    }
     _cameraDiscoverySession =
         [AVCaptureDeviceDiscoverySession discoverySessionWithDeviceTypes:deviceTypes
                                                                mediaType:AVMediaTypeVideo
@@ -496,9 +554,13 @@
 - (BOOL)configureCameraDevice:(NSError **)error {
   AVCaptureDeviceType deviceType;
   if (_position == AVCaptureDevicePositionFront) {
-    deviceType = AVCaptureDeviceTypeBuiltInWideAngleCamera;
+    if (@available(iOS 11.1, *)) {
+      deviceType = AVCaptureDeviceTypeBuiltInTrueDepthCamera;
+    } else {
+      deviceType = AVCaptureDeviceTypeBuiltInWideAngleCamera;
+    }
   } else {
-    deviceType = AVCaptureDeviceTypeBuiltInDualCamera;
+    deviceType = AVCaptureDeviceTypeBuiltInWideAngleCamera;  // AVCaptureDeviceTypeBuiltInDualCamera;
   }
 
   AVCaptureDevice *newCameraDevice = nil;
@@ -549,6 +611,9 @@
       if (@available(iOS 11.0, *)) {
         self.photoOutput.depthDataDeliveryEnabled = self.photoOutput.depthDataDeliverySupported;
       }
+      if (@available(iOS 12.0, *)) {
+        self.photoOutput.portraitEffectsMatteDeliveryEnabled = self.photoOutput.portraitEffectsMatteDeliverySupported;
+      }
 
       [self.captureSession commitConfiguration];
     } else {
@@ -563,8 +628,14 @@
 - (AVCapturePhotoSettings *)configurePhotoSetting {
   // AVCapturePhotoSettings 생성
   AVCapturePhotoSettings *setting;
+
   if (@available(iOS 11.0, *)) {
-    if ([self.photoOutput.availablePhotoCodecTypes containsObject:AVVideoCodecTypeHEVC]) {
+    if (self.rawDataEnable && self.photoOutput.availableRawPhotoPixelFormatTypes.count > 0) {
+//      NSLog(@"dbtest raw types : %@",self.photoOutput.availableRawPhotoFileTypes);
+//      setting = [AVCapturePhotoSettings photoSettingsWithRawPixelFormatType:kCVPixelFormatType_420YpCbCr8PlanarFullRange
+//                                                            processedFormat:@{AVVideoCodecKey : AVVideoCodecTypeHEVC}];
+      setting.autoStillImageStabilizationEnabled = NO;
+    } else if ([self.photoOutput.availablePhotoCodecTypes containsObject:AVVideoCodecTypeHEVC]) {
       setting = [AVCapturePhotoSettings photoSettingsWithFormat:@{AVVideoCodecKey : AVVideoCodecTypeHEVC}];
     } else {
       setting = [AVCapturePhotoSettings photoSettings];
@@ -604,6 +675,15 @@
       setting.depthDataDeliveryEnabled = YES;
     } else {
       setting.depthDataDeliveryEnabled = NO;
+    }
+  }
+
+  // portraitEffectsMatte 설정
+  if (@available(iOS 12.0, *)) {
+    if (self.portraitEffectsMatteEnable && self.photoOutput.portraitEffectsMatteDeliverySupported) {
+      setting.portraitEffectsMatteDeliveryEnabled = YES;
+    } else {
+      setting.portraitEffectsMatteDeliveryEnabled = NO;
     }
   }
 
@@ -659,8 +739,8 @@
 }
 
 - (void)subjectAreaDidChange:(NSNotification *)notification { // 카메라화면에 많은 변화가 있으면 다시 포커스와 밝기를 맞춘다.
-  [self focusWithMode:AVCaptureFocusModeAutoFocus
-       exposeWithMode:AVCaptureExposureModeAutoExpose
+  [self focusWithMode:self.focus
+       exposeWithMode:self.exposure
         atDevicePoint:CGPointMake(0.5, 0.5)
 monitorSubjectAreaChange:NO];
 }

@@ -19,6 +19,8 @@
 
 @property(nonatomic) NSData *photoData;
 @property(nonatomic) NSURL *livePhotoCompanionMovieURL;
+@property(nonatomic) NSURL *rawDataURL;
+@property(nonatomic) NSData *portraitEffectsMatteData;
 
 @end
 
@@ -70,7 +72,51 @@
     NSLog(@"Error capturing photo: %@", error);
     return;
   }
-  self.photoData = [photo fileDataRepresentation];
+  
+  if (photo.isRawPhoto) {
+    NSURL *dngFileURL = [self makeUniqueTempFileURL:@"dng"];
+    NSData *dngData = [photo fileDataRepresentation];
+    if (![dngData writeToURL:dngFileURL atomically:YES]) {
+      NSLog(@"dbtest Error saving raw data:%@",dngFileURL.absoluteString);
+      return;
+    }
+    self.rawDataURL = dngFileURL;
+  } else {
+    self.photoData = [photo fileDataRepresentation];
+    self.rawDataURL = nil;
+  }
+
+  // Portrait Effects Matte only gets generated if there is a face
+  if (@available(iOS 12.0, *)) {
+    if (photo.portraitEffectsMatte != nil) {
+      // 사진의 orientation 정보를 가져온다.
+      CGImagePropertyOrientation orientation =
+          [[photo.metadata objectForKey:(NSString *)kCGImagePropertyOrientation] intValue];
+
+      // 가져온 사진 orientation이 적용된 portraitEffectsMatte를 가져온다.
+      AVPortraitEffectsMatte *portraitEffectsMatte =
+          [photo.portraitEffectsMatte portraitEffectsMatteByApplyingExifOrientation:orientation];
+
+      // portraitEffectsMatte에서 buffer주소를 가져온다.
+      CVPixelBufferRef portraitEffectsMattePixelBuffer = [portraitEffectsMatte mattingImage];
+
+      // 가져온 buffer주소로 portraitEffectsMatte의 CIImage를 생성한다.
+      CIImage *portraitEffectsMatteImage = [CIImage imageWithCVPixelBuffer:portraitEffectsMattePixelBuffer
+                                                                   options:@{
+                                                                     kCIImageAuxiliaryPortraitEffectsMatte : @(YES)
+                                                                   }];
+      // CIImage에서 이미지포맷과 컬러스페이스,옵션등을 설정하여 이미지데이터를 만든다.
+      CIContext *context = [CIContext context];
+      CGColorSpaceRef linearColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceLinearSRGB);
+      self.portraitEffectsMatteData = [context
+          HEIFRepresentationOfImage:portraitEffectsMatteImage
+                             format:kCIFormatRGBA8
+                         colorSpace:linearColorSpace
+                            options:@{(id)kCIImageRepresentationPortraitEffectsMatteImage : portraitEffectsMatteImage}];
+    }
+  } else {
+    self.portraitEffectsMatteData = nil;
+  }
 }
 
 // 라이브포토가 촬영된 경우 호출, 새로운 미디어가 파일로 기록되지 않는다. 만약
@@ -121,6 +167,12 @@
         }
         PHAssetCreationRequest *creationRequest = [PHAssetCreationRequest creationRequestForAsset];
         [creationRequest addResourceWithType:PHAssetResourceTypePhoto data:self.photoData options:options];
+        
+        if (self.rawDataURL) {
+          PHAssetResourceCreationOptions *option = [[PHAssetResourceCreationOptions alloc] init];
+          option.shouldMoveFile = YES;
+          [creationRequest addResourceWithType:PHAssetResourceTypeAlternatePhoto fileURL:self.rawDataURL options:option];
+        }
 
         if (self.livePhotoCompanionMovieURL) {
           PHAssetResourceCreationOptions *livePhotoCompanionMovieResourceOptions =
@@ -129,6 +181,12 @@
           [creationRequest addResourceWithType:PHAssetResourceTypePairedVideo
                                        fileURL:self.livePhotoCompanionMovieURL
                                        options:livePhotoCompanionMovieResourceOptions];
+        }
+
+        // Save Portrait Effects Matte to Photos Library only if it was generated
+        if (self.portraitEffectsMatteData) {
+          PHAssetCreationRequest *creationRequest = [PHAssetCreationRequest creationRequestForAsset];
+          [creationRequest addResourceWithType:PHAssetResourceTypePhoto data:self.portraitEffectsMatteData options:nil];
         }
       }
           completionHandler:^(BOOL success, NSError *_Nullable error) {
@@ -159,6 +217,13 @@
   }
   
   self.completionHandler(self);
+}
+
+- (NSURL *)makeUniqueTempFileURL:(NSString *)extenstion {
+  NSURL *tempURL = [[NSFileManager defaultManager] temporaryDirectory];
+  NSString *uniqueFileName = [NSProcessInfo processInfo].globallyUniqueString;
+  NSURL *uniqueFileURL = [tempURL URLByAppendingPathComponent:uniqueFileName];
+  return [uniqueFileURL URLByAppendingPathExtension:extenstion];
 }
 
 @end

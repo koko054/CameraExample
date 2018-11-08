@@ -37,14 +37,19 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 
 @interface Camera : NSObject
 
-@property(nonatomic, assign, readonly) CameraMode mode;
-@property(nonatomic, assign, readonly) AVCaptureDevicePosition position;
-@property(nonatomic, assign, readonly) AVCaptureFlashMode flash;
-@property(nonatomic, assign, readonly) BOOL livePhotoEnable;
-@property(nonatomic, assign, readonly) BOOL depthDataDeliveryEnable;
+@property(nonatomic, assign, readonly) CameraMode mode;                   // 사진, 비디오
+@property(nonatomic, assign, readonly) AVCaptureDevicePosition position;  // 전면, 후면
+@property(nonatomic, assign, readonly) AVCaptureFlashMode flash;          // 자동, 켬, 끔
+@property(nonatomic, assign, readonly) AVCaptureFocusMode focus;          // 자동, 고정, 연속자동
+@property(nonatomic, assign, readonly) AVCaptureExposureMode exposure;    // 자동, 고정, 연속자동, 커스텀
+@property(nonatomic, assign, readonly) BOOL livePhotoEnable;              // 라이브포토
+@property(nonatomic, assign, readonly) BOOL depthDataDeliveryEnable;      // depth 데이터
+@property(nonatomic, assign, readonly) BOOL portraitEffectsMatteEnable;   // 전면 인물 depth 데이터
+@property(nonatomic, assign, readonly) BOOL rawDataEnable;                // raw 데이터
+@property(nonatomic, assign, readonly) BOOL lensStabilizationEnable;      // 손떨림방지기능
 
 /**
- Camera 객체를 async하게 생성한다.
+ Camera 싱글톤객체를 async하게 생성한다.
  기본적으로 mode는 CameraModePhoto, posotion은 AVCaptureDevicePositionBack으로
  설정된다.
 
@@ -54,7 +59,7 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 + (void)configureCamera:(void (^)(Camera *camera, NSError *error))complete;
 
 /**
- Camera 객체를 async하게 생성한다.
+ Camera 싱글톤객체를 async하게 생성한다.
 
  @param mode 초기 카메라모드
  @param position 초기 카메라 위치 (전/후면카메라)
@@ -117,7 +122,7 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 
 /**
  비디오촬영 중 사진 스냅샷이 가능한지 확인
- 
+
  @return 스냅샷 가능:YES, 불가능:NO
  */
 - (BOOL)availableSnapShot;
@@ -177,6 +182,21 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 - (void)setFlash:(AVCaptureFlashMode)flash;
 
 /**
+ focus 모드 설정
+
+ @param focus AVCaptureFocusModeLocked, AVCaptureFocusModeAutoFocus, AVCaptureFocusModeContinuousAutoFocus
+ */
+- (void)setFocus:(AVCaptureFocusMode)focus;
+
+/**
+ exposure 모드 설정
+
+ @param exposure AVCaptureExposureModeLocked, AVCaptureExposureModeAutoExpose,
+                 AVCaptureExposureModeContinuousAutoExposure, AVCaptureExposureModeCustom
+ */
+- (void)setExposure:(AVCaptureExposureMode)exposure;
+
+/**
  라이브포토 활성화/비활성화
 
  @param livePhotoEnable 활성화:YES, 비활성화:NO
@@ -189,6 +209,21 @@ typedef NS_ENUM(NSInteger, CameraMode) {
  @param depthDataDeliveryEnable 활성화:YES, 비활성화:NO
  */
 - (void)setDepthDataDeliveryEnable:(BOOL)depthDataDeliveryEnable;
+
+/**
+ portraitEffectsMatteEnable 활성화/비활성화
+ (iOS12 이상만 활성화가능, depthDataDelivery가 활성화되어야 사용가능)
+
+ @param portraitEffectsMatteEnable 활성화:YES, 비활성화:NO
+ */
+- (void)setPortraitEffectsMatteEnable:(BOOL)portraitEffectsMatteEnable;
+
+/**
+ RAW Data 활성화/비활성화
+
+ @param rawDataEnable 활성화:YES, 비활성화:NO
+ */
+- (void)setRawDataEnable:(BOOL)rawDataEnable;
 
 /**
  입력된 포인터로 포커스와 밝기를 자동으로 맞춘다.

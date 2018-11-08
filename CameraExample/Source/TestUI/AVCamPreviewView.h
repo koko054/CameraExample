@@ -11,8 +11,8 @@ Application preview view.
 
 @interface AVCamPreviewView : UIView
 
-@property (nonatomic, readonly) AVCaptureVideoPreviewLayer *videoPreviewLayer;
+@property(nonatomic, readonly) AVCaptureVideoPreviewLayer *videoPreviewLayer;
 
-@property (nonatomic) AVCaptureSession *session;
+@property(nonatomic) AVCaptureSession *session;
 
 @end

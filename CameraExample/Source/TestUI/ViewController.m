@@ -32,7 +32,7 @@
 @property(nonatomic, strong) UIButton *snapShotButton;
 @property(nonatomic, strong) UIButton *livePhotoButton;
 @property(nonatomic, strong) UIButton *flashButton;
-@property(nonatomic, strong) UIButton *focusModeButton;
+@property(nonatomic, strong) UIButton *formatButton;
 @property(nonatomic, strong) UIButton *exposureModeButton;
 @property(nonatomic, strong) UIButton *rotateButton;
 
@@ -52,7 +52,7 @@
   [self.buttonPanel addSubview:self.snapShotButton];
   [self.buttonPanel addSubview:self.livePhotoButton];
   [self.buttonPanel addSubview:self.flashButton];
-  [self.buttonPanel addSubview:self.focusModeButton];
+  [self.buttonPanel addSubview:self.formatButton];
   [self.buttonPanel addSubview:self.exposureModeButton];
   [self.buttonPanel addSubview:self.rotateButton];
 
@@ -191,12 +191,12 @@
   return _flashButton;
 }
 
-- (UIButton *)focusModeButton {
-  if (!_focusModeButton) {
-    _focusModeButton = [self testButtonRow:1 column:1];
-    [_focusModeButton setTitle:@"auto\nfocus" forState:UIControlStateNormal];
+- (UIButton *)formatButton {
+  if (!_formatButton) {
+    _formatButton = [self testButtonRow:1 column:1];
+    [_formatButton setTitle:@"HEIF" forState:UIControlStateNormal];
   }
-  return _focusModeButton;
+  return _formatButton;
 }
 
 - (UIButton *)exposureModeButton {
@@ -220,8 +220,8 @@
   if (sender == self.captureButton) {
     if (self.camera.mode == CameraModePhoto) {
       [self.camera takePhotoWithDelegate:self
-                                complete:^{
-                                  NSLog(@"dbtest takePhoto complete");
+                                complete:^(UIImage *previewImage) {
+                                  NSLog(@"dbtest take photo complete");
                                 }];
     } else if (self.camera.mode == CameraModeVideo) {
       if (![self.camera isRecording]) {
@@ -290,13 +290,38 @@
         break;
     }
     [self.camera setFlash:nextFlash];
-  } else if (sender == self.focusModeButton) {
-    self.camera.rawDataEnable = YES;
+  } else if (sender == self.formatButton) {
+    switch (self.camera.photoFormat) {
+      case PhotoFormatHEIF:
+        self.camera.photoFormat = PhotoFormatJPEG;
+        [self.formatButton setTitle:@"JPEG" forState:UIControlStateNormal];
+        break;
+      case PhotoFormatJPEG:
+        self.camera.photoFormat = PhotoFormatRAW;
+        [self.formatButton setTitle:@"RAW" forState:UIControlStateNormal];
+        break;
+      case PhotoFormatRAW:
+        self.camera.photoFormat = PhotoFormatRAWHEIF;
+        [self.formatButton setTitle:@"RAW\nHEIF" forState:UIControlStateNormal];
+        break;
+      case PhotoFormatRAWHEIF:
+        self.camera.photoFormat = PhotoFormatRAWJPEG;
+        [self.formatButton setTitle:@"RAW\nJPEG" forState:UIControlStateNormal];
+        break;
+      case PhotoFormatRAWJPEG:
+        self.camera.photoFormat = PhotoFormatHEIF;
+        [self.formatButton setTitle:@"HEIF" forState:UIControlStateNormal];
+        break;
+      default:
+        self.camera.photoFormat = PhotoFormatHEIF;
+        [self.formatButton setTitle:@"HEIF" forState:UIControlStateNormal];
+        break;
+    }
   } else if (sender == self.exposureModeButton) {
   } else if (sender == self.snapShotButton) {
     if (self.camera.isRecording && self.camera.availableSnapShot) {
       [self.camera takePhotoWithDelegate:self
-                                complete:^{
+                                complete:^(UIImage *previewImage) {
                                   NSLog(@"dbtest take snap shot");
                                 }];
     }

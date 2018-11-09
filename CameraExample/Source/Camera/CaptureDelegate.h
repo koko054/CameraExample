@@ -9,6 +9,7 @@
 #import <Foundation/Foundation.h>
 #import <AVFoundation/AVFoundation.h>
 
+@class Camera;
 @interface CaptureDelegate : NSObject<AVCapturePhotoCaptureDelegate>
 
 - (instancetype)initWithSettings:(AVCapturePhotoSettings *)settings
@@ -17,5 +18,6 @@
                         complete:(void (^)(CaptureDelegate *delegate))complete;
 
 @property(nonatomic, readonly) AVCapturePhotoSettings *requestedPhotoSettings;
+@property(nonatomic, readonly) UIImage *previewImage;
 
 @end

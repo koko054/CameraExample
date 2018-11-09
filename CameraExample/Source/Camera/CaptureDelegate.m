@@ -18,9 +18,10 @@
 @property(nonatomic) void (^completionHandler)(CaptureDelegate *delegate);
 
 @property(nonatomic) NSData *photoData;
+@property(nonatomic) NSData *rawData;
 @property(nonatomic) NSURL *livePhotoCompanionMovieURL;
-@property(nonatomic) NSURL *rawDataURL;
 @property(nonatomic) NSData *portraitEffectsMatteData;
+@property(nonatomic) UIImage *previewImage;
 
 @end
 
@@ -72,18 +73,22 @@
     NSLog(@"Error capturing photo: %@", error);
     return;
   }
-  
+
+  if (photo.previewPixelBuffer) {
+    CGImageRef cgImgRef = [photo previewCGImageRepresentation];
+    self.previewImage = [UIImage imageWithCGImage:cgImgRef];
+  }
+
   if (photo.isRawPhoto) {
     NSURL *dngFileURL = [self makeUniqueTempFileURL:@"dng"];
     NSData *dngData = [photo fileDataRepresentation];
     if (![dngData writeToURL:dngFileURL atomically:YES]) {
-      NSLog(@"dbtest Error saving raw data:%@",dngFileURL.absoluteString);
+      NSLog(@"dbtest Error saving raw data:%@", dngFileURL.absoluteString);
       return;
     }
-    self.rawDataURL = dngFileURL;
+    self.rawData = dngData;
   } else {
     self.photoData = [photo fileDataRepresentation];
-    self.rawDataURL = nil;
   }
 
   // Portrait Effects Matte only gets generated if there is a face
@@ -152,7 +157,7 @@
     return;
   }
 
-  if (self.photoData == nil) {
+  if (self.photoData == nil && self.rawData == nil /*&& self.rawDataURL == nil*/) {
     NSLog(@"No photo data resource");
     [self didFinish];
     return;
@@ -165,13 +170,17 @@
         if (@available(iOS 11.0, *)) {
           options.uniformTypeIdentifier = self.requestedPhotoSettings.processedFileType;
         }
+
         PHAssetCreationRequest *creationRequest = [PHAssetCreationRequest creationRequestForAsset];
-        [creationRequest addResourceWithType:PHAssetResourceTypePhoto data:self.photoData options:options];
-        
-        if (self.rawDataURL) {
-          PHAssetResourceCreationOptions *option = [[PHAssetResourceCreationOptions alloc] init];
-          option.shouldMoveFile = YES;
-          [creationRequest addResourceWithType:PHAssetResourceTypeAlternatePhoto fileURL:self.rawDataURL options:option];
+        if (self.photoData && self.rawData) {
+          [creationRequest addResourceWithType:PHAssetResourceTypePhoto data:self.photoData options:options];
+        } else if (self.photoData) {
+          [creationRequest addResourceWithType:PHAssetResourceTypePhoto data:self.photoData options:options];
+        } else if (self.rawData) {
+          if (@available(iOS 11.0, *)) {
+            options.uniformTypeIdentifier = self.requestedPhotoSettings.rawFileType;
+          }
+          [creationRequest addResourceWithType:PHAssetResourceTypePhoto data:self.rawData options:options];
         }
 
         if (self.livePhotoCompanionMovieURL) {
@@ -193,7 +202,24 @@
             if (!success) {
               NSLog(@"Error occurred while saving photo to photo library: %@", error);
             }
-            [self didFinish];
+            if (self.photoData && self.rawData) {
+              [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
+                PHAssetResourceCreationOptions *options = [[PHAssetResourceCreationOptions alloc] init];
+                if (@available(iOS 11.0, *)) {
+                  options.uniformTypeIdentifier = self.requestedPhotoSettings.rawFileType;
+                }
+                PHAssetCreationRequest *creationRequest = [PHAssetCreationRequest creationRequestForAsset];
+                [creationRequest addResourceWithType:PHAssetResourceTypePhoto data:self.rawData options:options];
+              }
+                  completionHandler:^(BOOL success, NSError *_Nullable error) {
+                    if (!success) {
+                      NSLog(@"Error occurred while saving photo to photo library: %@", error);
+                    }
+                    [self didFinish];
+                  }];
+            } else {
+              [self didFinish];
+            }
           }];
     } else {
       NSLog(@"Not authorized to save photo");
@@ -203,19 +229,16 @@
 }
 
 - (void)didFinish {
-  if ([[NSFileManager defaultManager]
-       fileExistsAtPath:self.livePhotoCompanionMovieURL.path]) {
+  if ([[NSFileManager defaultManager] fileExistsAtPath:self.livePhotoCompanionMovieURL.path]) {
     NSError *error = nil;
-    [[NSFileManager defaultManager]
-     removeItemAtPath:self.livePhotoCompanionMovieURL.path
-     error:&error];
-    
+    [[NSFileManager defaultManager] removeItemAtPath:self.livePhotoCompanionMovieURL.path error:&error];
+
     if (error) {
-      NSLog(@"Could not remove file at url: %@",
-            self.livePhotoCompanionMovieURL.path);
+      NSLog(@"Could not remove livePhoto file at url: %@", self.livePhotoCompanionMovieURL.path);
     }
   }
-  
+  self.rawData = nil;
+  self.photoData = nil;
   self.completionHandler(self);
 }
 

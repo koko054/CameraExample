@@ -19,11 +19,14 @@
 // 포커스
 // 밝기
 
-typedef NS_ENUM(NSInteger, CameraMode) {
-  CameraModeUnknown,
-  CameraModePhoto,
-  CameraModeVideo,
-  CameraModeCount
+typedef NS_ENUM(NSInteger, CameraMode) { CameraModeUnknown, CameraModePhoto, CameraModeVideo, CameraModeCount };
+
+typedef NS_ENUM(NSInteger, PhotoFormat) {
+  PhotoFormatHEIF,
+  PhotoFormatJPEG,
+  PhotoFormatRAW,
+  PhotoFormatRAWHEIF,
+  PhotoFormatRAWJPEG
 };
 
 @protocol CameraCaptureUIDelegate<NSObject>
@@ -45,8 +48,9 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 @property(nonatomic, assign, readonly) BOOL livePhotoEnable;              // 라이브포토
 @property(nonatomic, assign, readonly) BOOL depthDataDeliveryEnable;      // depth 데이터
 @property(nonatomic, assign, readonly) BOOL portraitEffectsMatteEnable;   // 전면 인물 depth 데이터
-@property(nonatomic, assign, readonly) BOOL rawDataEnable;                // raw 데이터
 @property(nonatomic, assign, readonly) BOOL lensStabilizationEnable;      // 손떨림방지기능
+@property(nonatomic, assign, readonly) PhotoFormat photoFormat;           // 사진포맷 (HEIF,JPEG,RAW,RAW/JPEG)
+@property(nonatomic, assign, readonly) CGSize previewPhotoSize;
 
 /**
  Camera 싱글톤객체를 async하게 생성한다.
@@ -111,7 +115,8 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 /**
  사진촬영 또는 라이브포토촬영(livePhotoEnable을 YES설정시)
  */
-- (void)takePhotoWithDelegate:(id<CameraCaptureUIDelegate>)uiDelegate complete:(void (^)(void))complete;
+- (void)takePhotoWithDelegate:(id<CameraCaptureUIDelegate>)uiDelegate
+                     complete:(void (^)(UIImage *previewImage))complete;
 
 /**
  비디오촬영중인지 확인하는 기능
@@ -219,11 +224,18 @@ typedef NS_ENUM(NSInteger, CameraMode) {
 - (void)setPortraitEffectsMatteEnable:(BOOL)portraitEffectsMatteEnable;
 
 /**
- RAW Data 활성화/비활성화
+ 사진 포맷
 
- @param rawDataEnable 활성화:YES, 비활성화:NO
+ @param photoFormat HEIF, JPEG, RAW, RAW/JPEG
  */
-- (void)setRawDataEnable:(BOOL)rawDataEnable;
+- (void)setPhotoFormat:(PhotoFormat)photoFormat;
+
+/**
+ 썸네일크기 설정
+
+ @param previewPhotoSize 썸네일크기
+ */
+- (void)setPreviewPhotoSize:(CGSize)previewPhotoSize;
 
 /**
  입력된 포인터로 포커스와 밝기를 자동으로 맞춘다.

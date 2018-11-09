@@ -162,7 +162,8 @@
 }
 
 // 사진/라이브포토 촬영
-- (void)takePhotoWithDelegate:(id<CameraCaptureUIDelegate>)uiDelegate complete:(void (^)(void))complete {
+- (void)takePhotoWithDelegate:(id<CameraCaptureUIDelegate>)uiDelegate
+                     complete:(void (^)(UIImage *previewImage))complete {
   NSAssert(uiDelegate, @"uiDelegate can't be nil");
   dispatch_async([Camera sessionQueue], ^{
     // 현재 카메라화면의 오리엔테이션을 적용
@@ -201,6 +202,11 @@
             // 촬영을 완료한 CaptureDelegate는 더 이상 필요없기 때문에 inProgressPhotoCaptureDelegates dictionary에서
             // 제거한다.
             self.inProgressPhotoCaptureDelegates[@(delegate.requestedPhotoSettings.uniqueID)] = nil;
+          });
+          dispatch_async(dispatch_get_main_queue(), ^{
+            if (complete) {
+              complete(delegate.previewImage);
+            }
           });
         }];
 
@@ -469,9 +475,15 @@
   }
 }
 
-- (void)setRawDataEnable:(BOOL)rawDataEnable {
-  if (_rawDataEnable != rawDataEnable) {
-    _rawDataEnable = rawDataEnable;
+- (void)setPhotoFormat:(PhotoFormat)photoFormat {
+  if (_photoFormat != photoFormat) {
+    _photoFormat = photoFormat;
+  }
+}
+
+- (void)setPreviewPhotoSize:(CGSize)previewPhotoSize {
+  if (!CGSizeEqualToSize(_previewPhotoSize, previewPhotoSize)) {
+    _previewPhotoSize = previewPhotoSize;
   }
 }
 
@@ -626,21 +638,47 @@
 }
 
 - (AVCapturePhotoSettings *)configurePhotoSetting {
-  // AVCapturePhotoSettings 생성
+  // 설정된 PhotoFormat에 따라 AVCapturePhotoSettings 생성
   AVCapturePhotoSettings *setting;
-
   if (@available(iOS 11.0, *)) {
-    if (self.rawDataEnable && self.photoOutput.availableRawPhotoPixelFormatTypes.count > 0) {
-//      NSLog(@"dbtest raw types : %@",self.photoOutput.availableRawPhotoFileTypes);
-//      setting = [AVCapturePhotoSettings photoSettingsWithRawPixelFormatType:kCVPixelFormatType_420YpCbCr8PlanarFullRange
-//                                                            processedFormat:@{AVVideoCodecKey : AVVideoCodecTypeHEVC}];
-      setting.autoStillImageStabilizationEnabled = NO;
-    } else if ([self.photoOutput.availablePhotoCodecTypes containsObject:AVVideoCodecTypeHEVC]) {
+    // HEIF
+    if (self.photoFormat == PhotoFormatHEIF &&
+        [self.photoOutput.availablePhotoCodecTypes containsObject:AVVideoCodecTypeHEVC]) {
       setting = [AVCapturePhotoSettings photoSettingsWithFormat:@{AVVideoCodecKey : AVVideoCodecTypeHEVC}];
-    } else {
-      setting = [AVCapturePhotoSettings photoSettings];
     }
-  } else {
+    // JPEG
+    else if (self.photoFormat == PhotoFormatJPEG &&
+             [self.photoOutput.availablePhotoCodecTypes containsObject:AVVideoCodecTypeJPEG]) {
+      setting = [AVCapturePhotoSettings photoSettingsWithFormat:@{AVVideoCodecKey : AVVideoCodecTypeJPEG}];
+    }
+    // RAW
+    else if (self.photoFormat == PhotoFormatRAW && self.photoOutput.availableRawPhotoPixelFormatTypes.count > 0) {
+      NSNumber *rawFileType = self.photoOutput.availableRawPhotoPixelFormatTypes.firstObject;
+      setting = [AVCapturePhotoSettings photoSettingsWithRawPixelFormatType:(OSType)rawFileType.integerValue];
+      setting.autoStillImageStabilizationEnabled = NO;
+    }
+    // RAW + HEIF
+    else if (self.photoFormat == PhotoFormatRAWHEIF &&
+             [self.photoOutput.availablePhotoCodecTypes containsObject:AVVideoCodecTypeHEVC] &&
+             self.photoOutput.availableRawPhotoPixelFormatTypes.count > 0) {
+      NSNumber *rawFileType = self.photoOutput.availableRawPhotoPixelFormatTypes.firstObject;
+      setting = [AVCapturePhotoSettings photoSettingsWithRawPixelFormatType:(OSType)rawFileType.integerValue
+                                                            processedFormat:@{AVVideoCodecKey : AVVideoCodecTypeHEVC}];
+      setting.autoStillImageStabilizationEnabled = NO;
+    }
+    // RAW + JPEG
+    else if (self.photoFormat == PhotoFormatRAWJPEG &&
+             [self.photoOutput.availablePhotoCodecTypes containsObject:AVVideoCodecTypeJPEG] &&
+             self.photoOutput.availableRawPhotoPixelFormatTypes.count > 0) {
+      NSNumber *rawFileType = self.photoOutput.availableRawPhotoPixelFormatTypes.firstObject;
+      setting = [AVCapturePhotoSettings photoSettingsWithRawPixelFormatType:(OSType)rawFileType.integerValue
+                                                            processedFormat:@{AVVideoCodecKey : AVVideoCodecTypeJPEG}];
+      setting.autoStillImageStabilizationEnabled = NO;
+    }
+  }
+  
+  // 위 포맷에 따른 설정생성이 모두 불가능한 경우
+  if (!setting) {
     setting = [AVCapturePhotoSettings photoSettings];
   }
 
@@ -656,9 +694,17 @@
 
   setting.highResolutionPhotoEnabled = YES;  // 해상도 최대로 사용?
 
-  if (setting.availablePreviewPhotoPixelFormatTypes.count > 0) {  // 이건 뭐하는 건지 모르겠다. 예제에 있길래 넣은 코드
-    setting.previewPhotoFormat =
-        @{(NSString *)kCVPixelBufferPixelFormatTypeKey : setting.availablePreviewPhotoPixelFormatTypes.firstObject};
+  // previewPhoto(thumbnail) 관련 설정
+  if (setting.availablePreviewPhotoPixelFormatTypes.count > 0) {
+    NSMutableDictionary *previewPhotoInfo = [NSMutableDictionary dictionary];
+    [previewPhotoInfo setObject:setting.availablePreviewPhotoPixelFormatTypes.firstObject forKey:(NSString *)kCVPixelBufferPixelFormatTypeKey];
+    if (self.previewPhotoSize.width > 0.0) {
+      [previewPhotoInfo setObject:@(self.previewPhotoSize.width) forKey:(NSString *)kCVPixelBufferWidthKey];
+    }
+    if (self.previewPhotoSize.height > 0.0) {
+      [previewPhotoInfo setObject:@(self.previewPhotoSize.height) forKey:(NSString *)kCVPixelBufferHeightKey];
+    }
+    [setting setPreviewPhotoFormat:previewPhotoInfo];
   }
 
   // 라이브포토설정, 라이브포토를 임시저장해놓을 경로설정

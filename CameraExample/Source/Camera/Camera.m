@@ -85,9 +85,13 @@
     _flash = AVCaptureFlashModeAuto;
     _focus = AVCaptureFocusModeContinuousAutoFocus;
     _exposure = AVCaptureExposureModeAutoExpose;
+    _videoStabilizationMode = AVCaptureVideoStabilizationModeAuto;
     _livePhotoEnable = NO;
     _depthDataDeliveryEnable = NO;
     _portraitEffectsMatteEnable = NO;
+    _photoStabilizationEnable = YES;
+    _photoFormat = PhotoFormatHEIF;
+    _previewPhotoSize = CGSizeZero;
 
     // 카메라모드에 따라 프리셋설정
     AVCaptureSessionPreset preset = mode == CameraModePhoto ? AVCaptureSessionPresetPhoto : AVCaptureSessionPresetHigh;
@@ -129,7 +133,6 @@
 }
 
 #pragma mark - public functions
-
 // 외부 카메라출력뷰에 세션을 전달하기위한 함수
 - (AVCaptureSession *)session {
   return self.captureSession;
@@ -378,7 +381,7 @@
         // 비디오안정화?기능이 지원되면 적용
         AVCaptureConnection *connection = [movieFileOutput connectionWithMediaType:AVMediaTypeVideo];
         if (connection.isVideoStabilizationSupported) {
-          connection.preferredVideoStabilizationMode = AVCaptureVideoStabilizationModeAuto;
+          connection.preferredVideoStabilizationMode = self.videoStabilizationMode;
         }
 
         self.captureSession.sessionPreset = AVCaptureSessionPresetHigh;  // 비디오 프리셋 설정
@@ -433,6 +436,12 @@
   }
 }
 
+- (void)setVideoStabilizationMode:(AVCaptureVideoStabilizationMode)videoStabilizationMode {
+  if (_videoStabilizationMode != videoStabilizationMode) {
+    _videoStabilizationMode = videoStabilizationMode;
+  }
+}
+
 - (void)setLivePhotoEnable:(BOOL)livePhotoEnable {
   if (_livePhotoEnable != livePhotoEnable) {
     _livePhotoEnable = livePhotoEnable;
@@ -475,6 +484,12 @@
     }
   } else {
     _portraitEffectsMatteEnable = NO;
+  }
+}
+
+- (void)setPhotoStabilizationEnable:(BOOL)photoStabilizationEnable {
+  if (_photoStabilizationEnable != photoStabilizationEnable) {
+    _photoStabilizationEnable = photoStabilizationEnable;
   }
 }
 
@@ -619,7 +634,7 @@
 
       AVCaptureConnection *movieFileOutputConnection = [self.movieFileOutput connectionWithMediaType:AVMediaTypeVideo];
       if (movieFileOutputConnection.isVideoStabilizationSupported) {
-        movieFileOutputConnection.preferredVideoStabilizationMode = AVCaptureVideoStabilizationModeAuto;
+        movieFileOutputConnection.preferredVideoStabilizationMode = self.videoStabilizationMode;
       }
 
       if (self.photoOutput.livePhotoCaptureSupported) {  // 라이브포토가 되면 적용
@@ -627,7 +642,7 @@
       } else {
         self.photoOutput.livePhotoCaptureEnabled = NO;
       }
-      
+
       if (@available(iOS 11.0, *)) {  // depthDataDelivery가 되면 적용
         if (self.photoOutput.depthDataDeliverySupported) {
           self.photoOutput.depthDataDeliveryEnabled = self.depthDataDeliveryEnable;
@@ -635,7 +650,7 @@
           self.photoOutput.depthDataDeliveryEnabled = NO;
         }
       }
-      
+
       if (@available(iOS 12.0, *)) {
         if (self.photoOutput.portraitEffectsMatteDeliverySupported) {
           self.photoOutput.portraitEffectsMatteDeliveryEnabled = self.portraitEffectsMatteEnable;
@@ -662,11 +677,13 @@
     if (self.photoFormat == PhotoFormatHEIF &&
         [self.photoOutput.availablePhotoCodecTypes containsObject:AVVideoCodecTypeHEVC]) {
       setting = [AVCapturePhotoSettings photoSettingsWithFormat:@{AVVideoCodecKey : AVVideoCodecTypeHEVC}];
+      setting.autoStillImageStabilizationEnabled = self.photoStabilizationEnable;
     }
     // JPEG
     else if (self.photoFormat == PhotoFormatJPEG &&
              [self.photoOutput.availablePhotoCodecTypes containsObject:AVVideoCodecTypeJPEG]) {
       setting = [AVCapturePhotoSettings photoSettingsWithFormat:@{AVVideoCodecKey : AVVideoCodecTypeJPEG}];
+      setting.autoStillImageStabilizationEnabled = self.photoStabilizationEnable;
     }
     // RAW
     else if (self.photoFormat == PhotoFormatRAW && self.photoOutput.availableRawPhotoPixelFormatTypes.count > 0) {
@@ -693,7 +710,7 @@
       setting.autoStillImageStabilizationEnabled = NO;
     }
   }
-  
+
   // 위 포맷에 따른 설정생성이 모두 불가능한 경우
   if (!setting) {
     setting = [AVCapturePhotoSettings photoSettings];
@@ -714,7 +731,8 @@
   // previewPhoto(thumbnail) 관련 설정
   if (setting.availablePreviewPhotoPixelFormatTypes.count > 0) {
     NSMutableDictionary *previewPhotoInfo = [NSMutableDictionary dictionary];
-    [previewPhotoInfo setObject:setting.availablePreviewPhotoPixelFormatTypes.firstObject forKey:(NSString *)kCVPixelBufferPixelFormatTypeKey];
+    [previewPhotoInfo setObject:setting.availablePreviewPhotoPixelFormatTypes.firstObject
+                         forKey:(NSString *)kCVPixelBufferPixelFormatTypeKey];
     if (self.previewPhotoSize.width > 0.0) {
       [previewPhotoInfo setObject:@(self.previewPhotoSize.width) forKey:(NSString *)kCVPixelBufferWidthKey];
     }
@@ -754,7 +772,6 @@
 }
 
 #pragma mark KVO and Notifications
-
 - (void)addObservers {
   // 카메라화면에 많은 변화가 생기면 호출되는 노티피케이션 등록
   [[NSNotificationCenter defaultCenter] addObserver:self
@@ -817,5 +834,33 @@ monitorSubjectAreaChange:NO];
   
 }
 #endif
+
+- (NSArray<NSString *> *)observingPropertyList {
+  return @[
+           @"mode", @"position", @"flash", @"focus", @"exposure", @"videoStabilizationMode", @"livePhotoEnable", @"depthDataDeliveryEnable",
+           @"portraitEffectsMatteEnable", @"lensStabilizationEnable", @"photoFormat"
+           ];
+}
+
+- (void)addObserver:(NSObject *)observer {
+  if ([observer respondsToSelector:@selector(observeValueForKeyPath:ofObject:change:context:)]) {
+    [[self observingPropertyList] enumerateObjectsUsingBlock:^(NSString * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+      [self addObserver:observer forKeyPath:obj options:NSKeyValueObservingOptionNew context:nil];
+    }];
+  } else {
+    NSAssert(nil, @"Please, implement observeValueForKeyPath:ofObject:change:context: function.");
+  }
+}
+
+- (void)removeObserver:(NSObject *)observer {
+  if (observer && [self observationInfo]) {
+    @try {
+      [[self observingPropertyList] enumerateObjectsUsingBlock:^(NSString * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        [self removeObserver:observer forKeyPath:obj context:nil];
+      }];
+    }
+    @catch (NSException *exception) {}
+  }
+}
 
 @end

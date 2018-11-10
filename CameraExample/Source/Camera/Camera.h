@@ -35,22 +35,22 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 @optional
 - (void (^)(void))captureAnimation;
 - (void)capturingLivePhoto:(BOOL)capturing;
-
 @end
 
 @interface Camera : NSObject
 
 @property(nonatomic, assign, readonly) CameraMode mode;                   // 사진,비디오
 @property(nonatomic, assign, readonly) AVCaptureDevicePosition position;  // 전면,후면
-@property(nonatomic, assign, readonly) AVCaptureFlashMode flash;          // 자동,켬,끔 default:AVCaptureFlashModeAuto
-@property(nonatomic, assign, readonly) AVCaptureFocusMode focus;          // 자동,고정,연속자동 default:AVCaptureFocusModeContinuousAutoFocus
-@property(nonatomic, assign, readonly) AVCaptureExposureMode exposure;    // 자동,고정,연속자동,커스텀 default:AVCaptureExposureModeAutoExpose
-@property(nonatomic, assign, readonly) BOOL livePhotoEnable;              // 라이브포토 default:NO
-@property(nonatomic, assign, readonly) BOOL depthDataDeliveryEnable;      // depth 데이터 default:NO
-@property(nonatomic, assign, readonly) BOOL portraitEffectsMatteEnable;   // 전면 인물 depth 데이터 default:NO
-@property(nonatomic, assign, readonly) BOOL lensStabilizationEnable;      // 손떨림방지기능
-@property(nonatomic, assign, readonly) PhotoFormat photoFormat;           // 사진포맷 (HEIF,JPEG,RAW,RAW/JPEG) defualt:HEIF
-@property(nonatomic, assign, readonly) CGSize previewPhotoSize;           // 썸네일크기 default:CGSizeZero
+@property(nonatomic, assign, readonly) AVCaptureFlashMode flash;          // 자동,켬,끔
+@property(nonatomic, assign, readonly) AVCaptureFocusMode focus;          // 자동,고정,연속자동
+@property(nonatomic, assign, readonly) AVCaptureExposureMode exposure;    // 자동,고정,연속자동,커스텀
+@property(nonatomic, assign, readonly) AVCaptureVideoStabilizationMode videoStabilizationMode;  // 비디오 손떨림방지모드
+@property(nonatomic, assign, readonly) BOOL livePhotoEnable;                                    // 라이브포토
+@property(nonatomic, assign, readonly) BOOL depthDataDeliveryEnable;                            // depth 데이터
+@property(nonatomic, assign, readonly) BOOL portraitEffectsMatteEnable;  // 전면 인물 depth 데이터
+@property(nonatomic, assign, readonly) BOOL photoStabilizationEnable;    // 사진촬영시 손떨림방지기능
+@property(nonatomic, assign, readonly) PhotoFormat photoFormat;          // 사진포맷 (HEIF,JPEG,RAW,RAW/JPEG)
+@property(nonatomic, assign, readonly) CGSize previewPhotoSize;          // 썸네일크기
 
 /**
  Camera 싱글톤객체를 async하게 생성한다.
@@ -181,6 +181,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 
 /**
  flash 모드 설정
+ default : AVCaptureFlashModeAuto
 
  @param flash AVCaptureFlashModeOff, AVCaptureFlashModeOn, AVCaptureFlashModeAuto
  */
@@ -188,6 +189,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 
 /**
  focus 모드 설정
+ default : AVCaptureFocusModeContinuousAutoFocus
 
  @param focus AVCaptureFocusModeLocked, AVCaptureFocusModeAutoFocus, AVCaptureFocusModeContinuousAutoFocus
  */
@@ -195,6 +197,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 
 /**
  exposure 모드 설정
+ default : AVCaptureExposureModeAutoExpose
 
  @param exposure AVCaptureExposureModeLocked, AVCaptureExposureModeAutoExpose,
                  AVCaptureExposureModeContinuousAutoExposure, AVCaptureExposureModeCustom
@@ -202,8 +205,18 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 - (void)setExposure:(AVCaptureExposureMode)exposure;
 
 /**
- 라이브포토 활성화/비활성화
+ 비디오 손떨림방지모드 설정
+ default : AVCaptureVideoStabilizationModeAuto
 
+ @param videoStabilizationMode AVCaptureVideoStabilizationModeOff, AVCaptureVideoStabilizationModeStandard,
+ AVCaptureVideoStabilizationModeCinematic, AVCaptureVideoStabilizationModeAuto
+ */
+- (void)setVideoStabilizationMode:(AVCaptureVideoStabilizationMode)videoStabilizationMode;
+
+/**
+ 라이브포토 활성화/비활성화
+ defualt : NO
+ 
  @param livePhotoEnable 활성화:YES, 비활성화:NO
  */
 - (void)setLivePhotoEnable:(BOOL)livePhotoEnable;
@@ -217,7 +230,8 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 
 /**
  depthDataDelivery 활성화/비활성화 (iOS11 이상만 활성화 가능)
-
+ default : NO
+ 
  @param depthDataDeliveryEnable 활성화:YES, 비활성화:NO
  */
 - (void)setDepthDataDeliveryEnable:(BOOL)depthDataDeliveryEnable;
@@ -232,21 +246,32 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 /**
  portraitEffectsMatteEnable 활성화/비활성화
  (iOS12 이상만 활성화가능, depthDataDelivery가 활성화되어야 사용가능)
-
+ default : NO
+ 
  @param portraitEffectsMatteEnable 활성화:YES, 비활성화:NO
  */
 - (void)setPortraitEffectsMatteEnable:(BOOL)portraitEffectsMatteEnable;
 
 /**
- 사진 포맷
+ 손떨림방지기능 활성화/비활성화
+ default : YES
+ 
+ @param photoStabilizationEnable 활성화:YES, 비활성화:NO
+ */
+- (void)setPhotoStabilizationEnable:(BOOL)photoStabilizationEnable;
 
- @param photoFormat HEIF, JPEG, RAW, RAW/JPEG
+/**
+ 사진 포맷
+ default : PhotoFormatHEIF
+ 
+ @param photoFormat PhotoFormatHEIF, PhotoFormatJPEG, PhotoFormatRAW, PhotoFormatRAWHEIF, PhotoFormatRAWJPEG
  */
 - (void)setPhotoFormat:(PhotoFormat)photoFormat;
 
 /**
  썸네일크기 설정
-
+ default : CGSizeZero
+ 
  @param previewPhotoSize 썸네일크기
  */
 - (void)setPreviewPhotoSize:(CGSize)previewPhotoSize;
@@ -257,5 +282,11 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
  @param point x:0.0~1.0 / y:0.0~1.0
  */
 - (void)setFocusExposurePoint:(CGPoint)point;
+
+#pragma mark - KVO supports
+
+- (void)addObserver:(NSObject *)observer;
+
+- (void)removeObserver:(NSObject *)observer;
 
 @end

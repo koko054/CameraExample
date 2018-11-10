@@ -75,6 +75,7 @@
         self.previewView.session = camera.session;
         self.camera = camera;
         [self.camera startCapture];
+        [self.camera addObserver:self];
         self.camera.depthDataDeliveryEnable = YES;
         self.camera.portraitEffectsMatteEnable = YES;
         [UIView animateWithDuration:0.3
@@ -86,6 +87,19 @@
       NSLog(@"Failed configureCamera : %@", error.localizedDescription);
     }
   }];
+}
+
+- (void)dealloc {
+  [self.camera removeObserver:self];
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary *)change
+                       context:(void *)context {
+  NSLog(@"dbtest keyPath:%@ change:%@",keyPath,change);
+  id value = [object valueForKeyPath:keyPath];
+  NSLog(@"dbtest %@ : %@",keyPath,value);
 }
 
 - (void)viewWillAppear:(BOOL)animated {

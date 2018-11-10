@@ -84,7 +84,7 @@
     _position = position;
     _flash = AVCaptureFlashModeAuto;
     _focus = AVCaptureFocusModeContinuousAutoFocus;
-    _exposure = AVCaptureExposureModeAutoExpose;
+    _exposure = AVCaptureExposureModeContinuousAutoExposure;
     _videoStabilizationMode = AVCaptureVideoStabilizationModeAuto;
     _livePhotoEnable = NO;
     _depthDataDeliveryEnable = NO;
@@ -130,6 +130,9 @@
     self.inProgressLivePhotoCapturesCount = 0;
   }
   return self;
+}
+
+- (void)dealloc {
 }
 
 #pragma mark - public functions
@@ -436,6 +439,43 @@
   }
 }
 
+- (void)setFocusExposurePoint:(CGPoint)point {
+  [self focusWithMode:self.focus
+       exposeWithMode:self.exposure
+        atDevicePoint:point
+monitorSubjectAreaChange:YES];
+}
+
+- (void)focusWithMode:(AVCaptureFocusMode)focusMode
+       exposeWithMode:(AVCaptureExposureMode)exposureMode
+        atDevicePoint:(CGPoint)point
+monitorSubjectAreaChange:(BOOL)monitorSubjectAreaChange {
+  dispatch_async([Camera sessionQueue], ^{
+    AVCaptureDevice *device = self.videoInput.device;
+    NSError *error = nil;
+    if ([device lockForConfiguration:&error]) {
+      /*
+       Setting (focus/exposure)PointOfInterest alone does not initiate a (focus/exposure) operation.
+       Call set(Focus/Exposure)Mode() to apply the new point of interest.
+       */
+      if (device.isFocusPointOfInterestSupported && [device isFocusModeSupported:focusMode]) {
+        device.focusPointOfInterest = point;
+        device.focusMode = focusMode;
+      }
+      
+      if (device.isExposurePointOfInterestSupported && [device isExposureModeSupported:exposureMode]) {
+        device.exposurePointOfInterest = point;
+        device.exposureMode = exposureMode;
+      }
+      
+      device.subjectAreaChangeMonitoringEnabled = monitorSubjectAreaChange;
+      [device unlockForConfiguration];
+    } else {
+      NSLog(@"Could not lock device for configuration: %@", error);
+    }
+  });
+}
+
 - (void)setVideoStabilizationMode:(AVCaptureVideoStabilizationMode)videoStabilizationMode {
   if (_videoStabilizationMode != videoStabilizationMode) {
     _videoStabilizationMode = videoStabilizationMode;
@@ -503,43 +543,6 @@
   if (!CGSizeEqualToSize(_previewPhotoSize, previewPhotoSize)) {
     _previewPhotoSize = previewPhotoSize;
   }
-}
-
-- (void)setFocusExposurePoint:(CGPoint)point {
-  [self focusWithMode:AVCaptureFocusModeAutoFocus
-                exposeWithMode:AVCaptureExposureModeAutoExpose
-                 atDevicePoint:point
-      monitorSubjectAreaChange:YES];
-}
-
-- (void)focusWithMode:(AVCaptureFocusMode)focusMode
-              exposeWithMode:(AVCaptureExposureMode)exposureMode
-               atDevicePoint:(CGPoint)point
-    monitorSubjectAreaChange:(BOOL)monitorSubjectAreaChange {
-  dispatch_async([Camera sessionQueue], ^{
-    AVCaptureDevice *device = self.videoInput.device;
-    NSError *error = nil;
-    if ([device lockForConfiguration:&error]) {
-      /*
-       Setting (focus/exposure)PointOfInterest alone does not initiate a (focus/exposure) operation.
-       Call set(Focus/Exposure)Mode() to apply the new point of interest.
-       */
-      if (device.isFocusPointOfInterestSupported && [device isFocusModeSupported:focusMode]) {
-        device.focusPointOfInterest = point;
-        device.focusMode = focusMode;
-      }
-
-      if (device.isExposurePointOfInterestSupported && [device isExposureModeSupported:exposureMode]) {
-        device.exposurePointOfInterest = point;
-        device.exposureMode = exposureMode;
-      }
-
-      device.subjectAreaChangeMonitoringEnabled = monitorSubjectAreaChange;
-      [device unlockForConfiguration];
-    } else {
-      NSLog(@"Could not lock device for configuration: %@", error);
-    }
-  });
 }
 
 #pragma mark - private functions

@@ -197,12 +197,19 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 
 /**
  exposure 모드 설정
- default : AVCaptureExposureModeAutoExpose
+ default : AVCaptureExposureModeContinuousAutoExposure
 
  @param exposure AVCaptureExposureModeLocked, AVCaptureExposureModeAutoExpose,
                  AVCaptureExposureModeContinuousAutoExposure, AVCaptureExposureModeCustom
  */
 - (void)setExposure:(AVCaptureExposureMode)exposure;
+
+/**
+ 입력된 포인터로 포커스와 밝기를 자동으로 맞춘다.
+ 
+ @param point x:0.0~1.0 / y:0.0~1.0
+ */
+- (void)setFocusExposurePoint:(CGPoint)point;
 
 /**
  비디오 손떨림방지모드 설정
@@ -275,13 +282,6 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
  @param previewPhotoSize 썸네일크기
  */
 - (void)setPreviewPhotoSize:(CGSize)previewPhotoSize;
-
-/**
- 입력된 포인터로 포커스와 밝기를 자동으로 맞춘다.
-
- @param point x:0.0~1.0 / y:0.0~1.0
- */
-- (void)setFocusExposurePoint:(CGPoint)point;
 
 #pragma mark - KVO supports
 

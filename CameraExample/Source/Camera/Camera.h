@@ -42,8 +42,8 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 @property(nonatomic, assign, readonly) CameraMode mode;                   // 사진,비디오
 @property(nonatomic, assign, readonly) AVCaptureDevicePosition position;  // 전면,후면
 @property(nonatomic, assign, readonly) AVCaptureFlashMode flash;          // 자동,켬,끔
-@property(nonatomic, assign, readonly) AVCaptureFocusMode focus;          // 자동,고정,연속자동
-@property(nonatomic, assign, readonly) AVCaptureExposureMode exposure;    // 자동,고정,연속자동,커스텀
+@property(nonatomic, assign, readonly) AVCaptureFocusMode focusMode;          // 자동,고정,연속자동
+@property(nonatomic, assign, readonly) AVCaptureExposureMode exposureMode;    // 자동,고정,연속자동,커스텀
 @property(nonatomic, assign, readonly) AVCaptureVideoStabilizationMode videoStabilizationMode;  // 비디오 손떨림방지모드
 @property(nonatomic, assign, readonly) BOOL livePhotoEnable;                                    // 라이브포토
 @property(nonatomic, assign, readonly) BOOL depthDataDeliveryEnable;                            // depth 데이터
@@ -191,18 +191,18 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
  focus 모드 설정
  default : AVCaptureFocusModeContinuousAutoFocus
 
- @param focus AVCaptureFocusModeLocked, AVCaptureFocusModeAutoFocus, AVCaptureFocusModeContinuousAutoFocus
+ @param focusMode AVCaptureFocusModeLocked, AVCaptureFocusModeAutoFocus, AVCaptureFocusModeContinuousAutoFocus
  */
-- (void)setFocus:(AVCaptureFocusMode)focus;
+- (void)setFocus:(AVCaptureFocusMode)focusMode;
 
 /**
  exposure 모드 설정
  default : AVCaptureExposureModeContinuousAutoExposure
 
- @param exposure AVCaptureExposureModeLocked, AVCaptureExposureModeAutoExpose,
+ @param exposureMode AVCaptureExposureModeLocked, AVCaptureExposureModeAutoExpose,
                  AVCaptureExposureModeContinuousAutoExposure, AVCaptureExposureModeCustom
  */
-- (void)setExposure:(AVCaptureExposureMode)exposure;
+- (void)setExposureMode:(AVCaptureExposureMode)exposureMode;
 
 /**
  입력된 포인터로 포커스와 밝기를 자동으로 맞춘다.

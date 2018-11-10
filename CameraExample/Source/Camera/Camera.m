@@ -83,8 +83,8 @@
     _mode = mode;
     _position = position;
     _flash = AVCaptureFlashModeAuto;
-    _focus = AVCaptureFocusModeContinuousAutoFocus;
-    _exposure = AVCaptureExposureModeContinuousAutoExposure;
+    _focusMode = AVCaptureFocusModeContinuousAutoFocus;
+    _exposureMode = AVCaptureExposureModeContinuousAutoExposure;
     _videoStabilizationMode = AVCaptureVideoStabilizationModeAuto;
     _livePhotoEnable = NO;
     _depthDataDeliveryEnable = NO;
@@ -427,21 +427,21 @@
 }
 
 // focus 설정
-- (void)setFocus:(AVCaptureFocusMode)focus {
-  if (_focus != focus) {
-    _focus = focus;
+- (void)setFocus:(AVCaptureFocusMode)focusMode {
+  if (_focusMode != focusMode) {
+    _focusMode = focusMode;
   }
 }
 
-- (void)setExposure:(AVCaptureExposureMode)exposure {
-  if (_exposure != exposure) {
-    _exposure = exposure;
+- (void)setExposureMode:(AVCaptureExposureMode)exposureMode {
+  if (_exposureMode != exposureMode) {
+    _exposureMode = exposureMode;
   }
 }
 
 - (void)setFocusExposurePoint:(CGPoint)point {
-  [self focusWithMode:self.focus
-       exposeWithMode:self.exposure
+  [self focusWithMode:self.focusMode
+       exposeWithMode:self.exposureMode
         atDevicePoint:point
 monitorSubjectAreaChange:YES];
 }
@@ -822,8 +822,8 @@ monitorSubjectAreaChange:(BOOL)monitorSubjectAreaChange {
 }
 
 - (void)subjectAreaDidChange:(NSNotification *)notification { // 카메라화면에 많은 변화가 있으면 다시 포커스와 밝기를 맞춘다.
-  [self focusWithMode:self.focus
-       exposeWithMode:self.exposure
+  [self focusWithMode:self.focusMode
+       exposeWithMode:self.exposureMode
         atDevicePoint:CGPointMake(0.5, 0.5)
 monitorSubjectAreaChange:NO];
 }

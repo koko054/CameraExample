@@ -40,17 +40,17 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 
 @interface Camera : NSObject
 
-@property(nonatomic, assign, readonly) CameraMode mode;                   // 사진, 비디오
-@property(nonatomic, assign, readonly) AVCaptureDevicePosition position;  // 전면, 후면
-@property(nonatomic, assign, readonly) AVCaptureFlashMode flash;          // 자동, 켬, 끔
-@property(nonatomic, assign, readonly) AVCaptureFocusMode focus;          // 자동, 고정, 연속자동
-@property(nonatomic, assign, readonly) AVCaptureExposureMode exposure;    // 자동, 고정, 연속자동, 커스텀
-@property(nonatomic, assign, readonly) BOOL livePhotoEnable;              // 라이브포토
-@property(nonatomic, assign, readonly) BOOL depthDataDeliveryEnable;      // depth 데이터
-@property(nonatomic, assign, readonly) BOOL portraitEffectsMatteEnable;   // 전면 인물 depth 데이터
+@property(nonatomic, assign, readonly) CameraMode mode;                   // 사진,비디오
+@property(nonatomic, assign, readonly) AVCaptureDevicePosition position;  // 전면,후면
+@property(nonatomic, assign, readonly) AVCaptureFlashMode flash;          // 자동,켬,끔 default:AVCaptureFlashModeAuto
+@property(nonatomic, assign, readonly) AVCaptureFocusMode focus;          // 자동,고정,연속자동 default:AVCaptureFocusModeContinuousAutoFocus
+@property(nonatomic, assign, readonly) AVCaptureExposureMode exposure;    // 자동,고정,연속자동,커스텀 default:AVCaptureExposureModeAutoExpose
+@property(nonatomic, assign, readonly) BOOL livePhotoEnable;              // 라이브포토 default:NO
+@property(nonatomic, assign, readonly) BOOL depthDataDeliveryEnable;      // depth 데이터 default:NO
+@property(nonatomic, assign, readonly) BOOL portraitEffectsMatteEnable;   // 전면 인물 depth 데이터 default:NO
 @property(nonatomic, assign, readonly) BOOL lensStabilizationEnable;      // 손떨림방지기능
-@property(nonatomic, assign, readonly) PhotoFormat photoFormat;           // 사진포맷 (HEIF,JPEG,RAW,RAW/JPEG)
-@property(nonatomic, assign, readonly) CGSize previewPhotoSize;
+@property(nonatomic, assign, readonly) PhotoFormat photoFormat;           // 사진포맷 (HEIF,JPEG,RAW,RAW/JPEG) defualt:HEIF
+@property(nonatomic, assign, readonly) CGSize previewPhotoSize;           // 썸네일크기 default:CGSizeZero
 
 /**
  Camera 싱글톤객체를 async하게 생성한다.
@@ -209,11 +209,25 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 - (void)setLivePhotoEnable:(BOOL)livePhotoEnable;
 
 /**
+ depth data 지원여부
+
+ @return YES : 지원, NO : 지원안함
+ */
+- (BOOL)depthDataDeliverySupports;
+
+/**
  depthDataDelivery 활성화/비활성화 (iOS11 이상만 활성화 가능)
 
  @param depthDataDeliveryEnable 활성화:YES, 비활성화:NO
  */
 - (void)setDepthDataDeliveryEnable:(BOOL)depthDataDeliveryEnable;
+
+/**
+ portraitEffectsMatte 기능 지원여부확인
+
+ @return YES : 지원, NO : 지원안함
+ */
+- (BOOL)portraitEffectsMatteSupports;
 
 /**
  portraitEffectsMatteEnable 활성화/비활성화

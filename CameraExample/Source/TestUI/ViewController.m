@@ -75,6 +75,8 @@
         self.previewView.session = camera.session;
         self.camera = camera;
         [self.camera startCapture];
+        self.camera.depthDataDeliveryEnable = YES;
+        self.camera.portraitEffectsMatteEnable = YES;
         [UIView animateWithDuration:0.3
                          animations:^{
                            self.previewView.alpha = 1.0;

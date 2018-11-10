@@ -110,14 +110,6 @@
     // 사진출력 캡쳐세션에 연결
     if ([self.captureSession canAddOutput:self.photoOutput]) {
       [self.captureSession addOutput:self.photoOutput];
-
-      self.photoOutput.livePhotoCaptureEnabled = self.photoOutput.livePhotoCaptureSupported;
-      if (@available(iOS 11.0, *)) {
-        self.photoOutput.depthDataDeliveryEnabled = self.photoOutput.depthDataDeliverySupported;
-      }
-      if (@available(iOS 12.0, *)) {
-        self.photoOutput.portraitEffectsMatteDeliveryEnabled = self.photoOutput.portraitEffectsMatteDeliverySupported;
-      }
     } else {
       [self.captureSession commitConfiguration];
       return nil;
@@ -443,17 +435,21 @@
 
 - (void)setLivePhotoEnable:(BOOL)livePhotoEnable {
   if (_livePhotoEnable != livePhotoEnable) {
-    // livePhoto 지원이 안되는데 활성화할 경우 예외처리
-    if (!self.photoOutput.livePhotoCaptureSupported && livePhotoEnable) return;
     _livePhotoEnable = livePhotoEnable;
+  }
+}
+
+- (BOOL)depthDataDeliverySupports {
+  if (@available(iOS 11.0, *)) {
+    return self.photoOutput.depthDataDeliverySupported;
+  } else {
+    return NO;
   }
 }
 
 - (void)setDepthDataDeliveryEnable:(BOOL)depthDataDeliveryEnable {
   if (@available(iOS 11.0, *)) {
     if (_depthDataDeliveryEnable != depthDataDeliveryEnable) {
-      // depthDataDelivery 지원이 안되는데 활성화할 경우 예외처리
-      if (!self.photoOutput.depthDataDeliverySupported && depthDataDeliveryEnable) return;
       _depthDataDeliveryEnable = depthDataDeliveryEnable;
     }
   } else {
@@ -461,14 +457,21 @@
   }
 }
 
+- (BOOL)portraitEffectsMatteSupports {
+  if (@available(iOS 12.0, *)) {
+    return self.photoOutput.portraitEffectsMatteDeliverySupported;
+  } else {
+    return NO;
+  }
+}
+
 - (void)setPortraitEffectsMatteEnable:(BOOL)portraitEffectsMatteEnable {
   if (@available(iOS 12.0, *)) {
     if (_portraitEffectsMatteEnable != portraitEffectsMatteEnable) {
-      // portraitEffectsMatteEnable 지원이 안되는데 활성화할 경우 예외처리
-      if ((!self.photoOutput.portraitEffectsMatteDeliverySupported || !self.depthDataDeliveryEnable) &&
-          portraitEffectsMatteEnable)
-        return;
       _portraitEffectsMatteEnable = portraitEffectsMatteEnable;
+    }
+    if (_portraitEffectsMatteEnable && !_depthDataDeliveryEnable) {
+      self.depthDataDeliveryEnable = YES;
     }
   } else {
     _portraitEffectsMatteEnable = NO;
@@ -619,12 +622,26 @@
         movieFileOutputConnection.preferredVideoStabilizationMode = AVCaptureVideoStabilizationModeAuto;
       }
 
-      self.photoOutput.livePhotoCaptureEnabled = self.photoOutput.livePhotoCaptureSupported;
-      if (@available(iOS 11.0, *)) {
-        self.photoOutput.depthDataDeliveryEnabled = self.photoOutput.depthDataDeliverySupported;
+      if (self.photoOutput.livePhotoCaptureSupported) {  // 라이브포토가 되면 적용
+        self.photoOutput.livePhotoCaptureEnabled = self.livePhotoEnable;
+      } else {
+        self.photoOutput.livePhotoCaptureEnabled = NO;
       }
+      
+      if (@available(iOS 11.0, *)) {  // depthDataDelivery가 되면 적용
+        if (self.photoOutput.depthDataDeliverySupported) {
+          self.photoOutput.depthDataDeliveryEnabled = self.depthDataDeliveryEnable;
+        } else {
+          self.photoOutput.depthDataDeliveryEnabled = NO;
+        }
+      }
+      
       if (@available(iOS 12.0, *)) {
-        self.photoOutput.portraitEffectsMatteDeliveryEnabled = self.photoOutput.portraitEffectsMatteDeliverySupported;
+        if (self.photoOutput.portraitEffectsMatteDeliverySupported) {
+          self.photoOutput.portraitEffectsMatteDeliveryEnabled = self.portraitEffectsMatteEnable;
+        } else {
+          self.photoOutput.portraitEffectsMatteDeliveryEnabled = NO;
+        }
       }
 
       [self.captureSession commitConfiguration];

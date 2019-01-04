@@ -15,6 +15,11 @@
 
 #define USE_INTERRUPTION_NOTIFICATION 0
 
+#define EPSILON 1.0e-5f
+BOOL floatsAreEquivalentEpsilon(float left, float right, float epsilon) { return (ABS(left - right) < epsilon); }
+
+BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEpsilon(left, right, EPSILON); }
+
 @interface Camera ()<AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureFileOutputRecordingDelegate>
 
 @property(nonatomic, assign) BOOL sessionRunning;  // 캡쳐세션이 에러로 멈췄을때 다시 시작할지 판단하기위한 플래그
@@ -33,6 +38,8 @@
 @property(nonatomic, strong) AVCaptureMovieFileOutput *movieFileOutput;   // 비디오 출력
 
 @property(nonatomic, assign) UIBackgroundTaskIdentifier backgroundRecordingID;  // 백그라운드 태스크 관리
+
+@property(nonatomic, strong) NSArray<NSValue *> *exposureTimes;
 
 @end
 
@@ -92,6 +99,8 @@
     _photoStabilizationEnable = YES;
     _photoFormat = PhotoFormatHEIF;
     _previewPhotoSize = CGSizeZero;
+    _exposureISO = -1.0;
+    _exposureDuration = kCMTimeNegativeInfinity;
 
     // 카메라모드에 따라 프리셋설정
     AVCaptureSessionPreset preset = mode == CameraModePhoto ? AVCaptureSessionPresetPhoto : AVCaptureSessionPresetHigh;
@@ -427,7 +436,7 @@
 }
 
 // focus 설정
-- (void)setFocus:(AVCaptureFocusMode)focusMode {
+- (void)setFocusMode:(AVCaptureFocusMode)focusMode {
   if (_focusMode != focusMode) {
     _focusMode = focusMode;
   }
@@ -440,16 +449,13 @@
 }
 
 - (void)setFocusExposurePoint:(CGPoint)point {
-  [self focusWithMode:self.focusMode
-       exposeWithMode:self.exposureMode
-        atDevicePoint:point
-monitorSubjectAreaChange:YES];
+  [self focusWithMode:self.focusMode exposeWithMode:self.exposureMode atDevicePoint:point monitorSubjectAreaChange:YES];
 }
 
 - (void)focusWithMode:(AVCaptureFocusMode)focusMode
-       exposeWithMode:(AVCaptureExposureMode)exposureMode
-        atDevicePoint:(CGPoint)point
-monitorSubjectAreaChange:(BOOL)monitorSubjectAreaChange {
+              exposeWithMode:(AVCaptureExposureMode)exposureMode
+               atDevicePoint:(CGPoint)point
+    monitorSubjectAreaChange:(BOOL)monitorSubjectAreaChange {
   dispatch_async([Camera sessionQueue], ^{
     AVCaptureDevice *device = self.videoInput.device;
     NSError *error = nil;
@@ -462,12 +468,12 @@ monitorSubjectAreaChange:(BOOL)monitorSubjectAreaChange {
         device.focusPointOfInterest = point;
         device.focusMode = focusMode;
       }
-      
+
       if (device.isExposurePointOfInterestSupported && [device isExposureModeSupported:exposureMode]) {
         device.exposurePointOfInterest = point;
         device.exposureMode = exposureMode;
       }
-      
+
       device.subjectAreaChangeMonitoringEnabled = monitorSubjectAreaChange;
       [device unlockForConfiguration];
     } else {
@@ -542,6 +548,108 @@ monitorSubjectAreaChange:(BOOL)monitorSubjectAreaChange {
 - (void)setPreviewPhotoSize:(CGSize)previewPhotoSize {
   if (!CGSizeEqualToSize(_previewPhotoSize, previewPhotoSize)) {
     _previewPhotoSize = previewPhotoSize;
+  }
+}
+
+#pragma mark - manual camera
+
+- (CGFloat)aperture {
+  return self.cameraDevice.lensAperture;
+}
+
+- (CGFloat)focus {
+  return self.cameraDevice.lensPosition;
+}
+
+- (void)setFocus:(CGFloat)focus {
+  if (!floatsAreEquivalentEpsilon(focus, self.cameraDevice.lensPosition, 4.0e-3)) {
+    dispatch_async([Camera sessionQueue], ^{
+      NSError *error;
+      if ([self.cameraDevice lockForConfiguration:&error]) {
+        if ([self.cameraDevice isLockingFocusWithCustomLensPositionSupported]) {
+          [self.cameraDevice setFocusModeLockedWithLensPosition:focus
+                                              completionHandler:^(CMTime syncTime){
+                                              }];
+        }
+        [self.cameraDevice unlockForConfiguration];
+      }
+    });
+  }
+}
+
+- (CGFloat)minExposureISO {
+  return self.cameraDevice.activeFormat.minISO;
+}
+
+- (CGFloat)maxExposureISO {
+  return self.cameraDevice.activeFormat.maxISO;
+}
+
+- (CGFloat)commitedExposureISO {
+  return self.cameraDevice.ISO;
+}
+
+- (void)commitExposureISO:(CGFloat)exposureISO {
+  if (_exposureISO != exposureISO) {
+    _exposureISO = exposureISO;
+    [self commitExposure];
+  }
+}
+
+- (NSArray<NSValue *> *)exposureTimes {
+  if (!_exposureTimes) {
+    NSArray<NSNumber *> *scales = @[
+      @(8), @(12), @(16), @(24), @(32), @(48), @(64), @(96), @(128), @(192), @(256), @(384), @(512), @(768), @(1024),
+      @(1536), @(2048), @(3072), @(4096)
+    ];
+    NSMutableArray *temp = [NSMutableArray array];
+    [scales enumerateObjectsUsingBlock:^(NSNumber *_Nonnull obj, NSUInteger idx, BOOL *_Nonnull stop) {
+      [temp addObject:[NSValue valueWithCMTime:CMTimeMake(1, obj.intValue)]];
+    }];
+    _exposureTimes = temp;
+  }
+  return _exposureTimes;
+}
+
+- (CMTime)minExposureDuration {
+  return self.cameraDevice.activeFormat.minExposureDuration;
+}
+
+- (CMTime)maxExposureDuration {
+  return self.cameraDevice.activeFormat.maxExposureDuration;
+}
+
+- (CMTime)commitedExposureDuration {
+  return self.cameraDevice.exposureDuration;
+}
+
+- (void)commitExposureDuration:(CMTime)exposureDuration {
+  if (CMTimeCompare(_exposureDuration, exposureDuration) != 0) {
+    _exposureDuration = exposureDuration;
+    [self commitExposure];
+  }
+}
+
+- (void)commitExposureISO:(CGFloat)exposureISO duration:(CMTime)exposureDuration {
+  if (_exposureISO != exposureISO || CMTimeCompare(_exposureDuration, exposureDuration) != 0) {
+    _exposureISO = exposureISO;
+    _exposureDuration = exposureDuration;
+    [self commitExposure];
+  }
+}
+
+- (void)commitExposure {
+  NSError *error;
+  if ([self.cameraDevice lockForConfiguration:&error]) {
+    CGFloat iso = MIN(MAX(self.exposureISO, self.minExposureISO), self.maxExposureISO);
+    CMTime duration =
+        CMTimeMinimum(CMTimeMaximum(self.exposureDuration, self.minExposureDuration), self.maxExposureDuration);
+    NSLog(@"dbtest commit iso:%f duration:%d", iso, duration.timescale);
+    [self.cameraDevice setExposureModeCustomWithDuration:duration
+                                                     ISO:iso
+                                       completionHandler:^(CMTime syncTime){
+                                       }];
+    [self.cameraDevice unlockForConfiguration];
   }
 }
 
@@ -628,6 +736,8 @@ monitorSubjectAreaChange:(BOOL)monitorSubjectAreaChange {
         [self.captureSession addInput:newVideoInput];
         self.videoInput = newVideoInput;
         self.cameraDevice = newCameraDevice;
+        _exposureISO = self.cameraDevice.ISO;
+        _exposureDuration = self.cameraDevice.exposureDuration;
       } else if (self.videoInput) {
         [self.captureSession addInput:self.videoInput];
       } else {
@@ -794,7 +904,7 @@ monitorSubjectAreaChange:(BOOL)monitorSubjectAreaChange {
                                            selector:@selector(captureSessionWasInterrupted:)
                                                name:AVCaptureSessionWasInterruptedNotification
                                              object:self.captureSession];
-  
+
   // 캡쳐세션 인터럽트가 끝나면 호출되는 노티피케이션 등록
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(captureSessionInterruptionEnded:)

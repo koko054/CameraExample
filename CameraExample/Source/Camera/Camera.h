@@ -52,6 +52,10 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 @property(nonatomic, assign, readonly) PhotoFormat photoFormat;          // 사진포맷 (HEIF,JPEG,RAW,RAW/JPEG)
 @property(nonatomic, assign, readonly) CGSize previewPhotoSize;          // 썸네일크기
 
+@property(nonatomic, assign, readonly) CGFloat exposureISO;
+@property(nonatomic, assign, readonly) CMTime exposureDuration;
+@property(nonatomic, strong, readonly) NSArray<NSValue *> *exposureTimes;
+
 /**
  Camera 싱글톤객체를 async하게 생성한다.
  기본적으로 mode는 CameraModePhoto, posotion은 AVCaptureDevicePositionBack으로
@@ -193,7 +197,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 
  @param focusMode AVCaptureFocusModeLocked, AVCaptureFocusModeAutoFocus, AVCaptureFocusModeContinuousAutoFocus
  */
-- (void)setFocus:(AVCaptureFocusMode)focusMode;
+- (void)setFocusMode:(AVCaptureFocusMode)focusMode;
 
 /**
  exposure 모드 설정
@@ -282,6 +286,37 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
  @param previewPhotoSize 썸네일크기
  */
 - (void)setPreviewPhotoSize:(CGSize)previewPhotoSize;
+
+#pragma mark - manual camera
+
+// 카메라 조리개값 고정값
+- (CGFloat)aperture;
+
+// 카메라초점값 (0.0 ~ 1.0)
+- (CGFloat)focus;
+
+- (void)setFocus:(CGFloat)focus;
+
+// 카메라 밝기조절 (밝기조절은 DSLR과는 다르게 ISO와 셔터스피드로만 조절가능하다)
+- (CGFloat)minExposureISO;
+
+- (CGFloat)maxExposureISO;
+
+- (CGFloat)commitedExposureISO;
+
+- (CMTime)minExposureDuration;
+
+- (CMTime)maxExposureDuration;
+
+- (CMTime)commitedExposureDuration;
+
+- (void)commitExposureISO:(CGFloat)exposureISO;
+
+- (void)commitExposureDuration:(CMTime)exposureDuration;
+
+- (void)commitExposureISO:(CGFloat)exposureISO duration:(CMTime)exposureDuration;
+
+// 화이트밸런스
 
 #pragma mark - KVO supports
 

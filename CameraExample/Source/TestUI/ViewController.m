@@ -38,6 +38,8 @@
 
 @property(nonatomic, assign) CGFloat videoRecordingTime;
 
+@property(nonatomic, strong) UISlider *slider;
+
 @end
 
 @implementation ViewController
@@ -55,6 +57,8 @@
   [self.buttonPanel addSubview:self.formatButton];
   [self.buttonPanel addSubview:self.exposureModeButton];
   [self.buttonPanel addSubview:self.rotateButton];
+  
+  [self.view addSubview:self.slider];
 
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(applicationWillEnterForeground)
@@ -78,6 +82,15 @@
         [self.camera addObserver:self];
         self.camera.depthDataDeliveryEnable = YES;
         self.camera.portraitEffectsMatteEnable = YES;
+        NSLog(@"dbtest init time:%f",CMTimeGetSeconds(self.camera.commitedExposureDuration));
+        NSLog(@"dbtest max duration:%f",CMTimeGetSeconds(self.camera.maxExposureDuration));
+        NSLog(@"dbtest max suttherSeed:%lld",self.camera.maxExposureDuration.timescale/self.camera.maxExposureDuration.value);
+        
+        NSLog(@"dbtest min duration:%f",CMTimeGetSeconds(self.camera.minExposureDuration));
+        NSLog(@"dbtest min suttherSeed:%lld",self.camera.minExposureDuration.timescale/self.camera.minExposureDuration.value);
+        self.slider.minimumValue = 0.0;
+        self.slider.maximumValue = (CGFloat)self.camera.exposureTimes.count - 1;
+        self.slider.value = 1.0;
         [UIView animateWithDuration:0.3
                          animations:^{
                            self.previewView.alpha = 1.0;
@@ -342,6 +355,30 @@
                                 }];
     }
   }
+}
+
+- (UISlider *)slider {
+  if (!_slider) {
+    CGFloat width = self.view.frame.size.width * 0.8;
+    CGFloat height = self.view.frame.size.width * 0.1;
+    CGFloat left = (self.view.frame.size.width - width) * 0.5;
+    CGFloat top = self.buttonPanel.frame.origin.y - height;
+    _slider = [[UISlider alloc] initWithFrame:CGRectMake(left, top, width, height)];
+    [_slider addTarget:self action:@selector(sliderChanged:) forControlEvents:UIControlEventValueChanged];
+    _slider.minimumValue = 0.0;
+    _slider.maximumValue = 1.0;
+  }
+  return _slider;
+}
+
+- (void)sliderChanged:(UISlider *)slider {
+//  [self.camera setFocus:slider.value];
+  [self.camera commitExposureISO:slider.value];
+  [self.camera commitExposureISO:slider.value duration:self.camera.exposureDuration];
+//  NSInteger idx = (NSInteger)slider.value;
+//  NSLog(@"dbtest idx:%ld",idx);
+//  NSValue *timeValue = [self.camera.exposureTimes objectAtIndex:idx];
+//  [self.camera commitExposureDuration:timeValue.CMTimeValue];
 }
 
 - (void)showCameraPreview:(BOOL)show {

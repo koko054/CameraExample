@@ -79,11 +79,6 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
 }
 
 // 객체생성
-- (instancetype)init {
-  return [self initWithMode:CameraModePhoto position:AVCaptureDevicePositionBack error:nil];
-}
-
-// 객체생성
 - (instancetype)initWithMode:(CameraMode)mode position:(AVCaptureDevicePosition)position error:(NSError **)error {
   if (self = [super init]) {
     // 프로퍼티초기화

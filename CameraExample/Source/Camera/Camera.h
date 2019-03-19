@@ -79,21 +79,11 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
                        complete:(void (^)(Camera *camera, NSError *error))complete;
 
 /**
- Camera 객체를 sync하게 생성한다.
-
- @return Camera객체
+ 사용할 수 없는 메소드.
+ configureCamera:메소드나 congifureCameraWithMode:position:complete:메소드를 사용해야한다.
  */
-- (instancetype)init;
-
-/**
- Camera 객체를 sync하게 생성한다.
-
- @param mode 초기 카메라모드
- @param position 초기 카메라 위치 (전/후면카메라)
- @param error 생성필패 시 에러
- @return Camera객체
- */
-- (instancetype)initWithMode:(CameraMode)mode position:(AVCaptureDevicePosition)position error:(NSError **)error;
+- (instancetype)init
+    __attribute__((unavailable("Must use configureCamera: or congifureCameraWithMode:position:complete:  instead.")));
 
 /**
  현재 캡쳐세션 AVCaptureVideoPreviewLayer의 session으로 설정하면 해당 Layer에

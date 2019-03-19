@@ -47,7 +47,7 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
 
 #pragma mark - initialize
 
-// 카메라 세션 작업 큐 싱글톤객체로 생성
+// 카메라 세션 작업 큐를 싱글톤객체로 생성
 + (dispatch_queue_t)sessionQueue {
   static dispatch_queue_t sessionQueue;
   static dispatch_once_t onceToken;

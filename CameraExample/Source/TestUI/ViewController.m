@@ -57,7 +57,7 @@
   [self.buttonPanel addSubview:self.formatButton];
   [self.buttonPanel addSubview:self.exposureModeButton];
   [self.buttonPanel addSubview:self.rotateButton];
-  
+
   [self.view addSubview:self.slider];
 
   [[NSNotificationCenter defaultCenter] addObserver:self
@@ -82,12 +82,14 @@
         [self.camera addObserver:self];
         self.camera.depthDataDeliveryEnable = YES;
         self.camera.portraitEffectsMatteEnable = YES;
-        NSLog(@"dbtest init time:%f",CMTimeGetSeconds(self.camera.commitedExposureDuration));
-        NSLog(@"dbtest max duration:%f",CMTimeGetSeconds(self.camera.maxExposureDuration));
-        NSLog(@"dbtest max suttherSeed:%lld",self.camera.maxExposureDuration.timescale/self.camera.maxExposureDuration.value);
-        
-        NSLog(@"dbtest min duration:%f",CMTimeGetSeconds(self.camera.minExposureDuration));
-        NSLog(@"dbtest min suttherSeed:%lld",self.camera.minExposureDuration.timescale/self.camera.minExposureDuration.value);
+        NSLog(@"dbtest init time:%f", CMTimeGetSeconds(self.camera.commitedExposureDuration));
+        NSLog(@"dbtest max duration:%f", CMTimeGetSeconds(self.camera.maxExposureDuration));
+        NSLog(@"dbtest max suttherSeed:%lld",
+              self.camera.maxExposureDuration.timescale / self.camera.maxExposureDuration.value);
+
+        NSLog(@"dbtest min duration:%f", CMTimeGetSeconds(self.camera.minExposureDuration));
+        NSLog(@"dbtest min suttherSeed:%lld",
+              self.camera.minExposureDuration.timescale / self.camera.minExposureDuration.value);
         self.slider.minimumValue = 0.0;
         self.slider.maximumValue = (CGFloat)self.camera.exposureTimes.count - 1;
         self.slider.value = 1.0;
@@ -110,9 +112,9 @@
                       ofObject:(id)object
                         change:(NSDictionary *)change
                        context:(void *)context {
-  NSLog(@"dbtest keyPath:%@ change:%@",keyPath,change);
+  NSLog(@"dbtest keyPath:%@ change:%@", keyPath, change);
   id value = [object valueForKeyPath:keyPath];
-  NSLog(@"dbtest %@ : %@",keyPath,value);
+  NSLog(@"dbtest %@ : %@", keyPath, value);
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -372,13 +374,13 @@
 }
 
 - (void)sliderChanged:(UISlider *)slider {
-//  [self.camera setFocus:slider.value];
+  //  [self.camera setFocus:slider.value];
   [self.camera commitExposureISO:slider.value];
   [self.camera commitExposureISO:slider.value duration:self.camera.exposureDuration];
-//  NSInteger idx = (NSInteger)slider.value;
-//  NSLog(@"dbtest idx:%ld",idx);
-//  NSValue *timeValue = [self.camera.exposureTimes objectAtIndex:idx];
-//  [self.camera commitExposureDuration:timeValue.CMTimeValue];
+  //  NSInteger idx = (NSInteger)slider.value;
+  //  NSLog(@"dbtest idx:%ld",idx);
+  //  NSValue *timeValue = [self.camera.exposureTimes objectAtIndex:idx];
+  //  [self.camera commitExposureDuration:timeValue.CMTimeValue];
 }
 
 - (void)showCameraPreview:(BOOL)show {

@@ -39,11 +39,11 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 
 @interface Camera : NSObject
 
-@property(nonatomic, assign, readonly) CameraMode mode;                   // 사진,비디오
-@property(nonatomic, assign, readonly) AVCaptureDevicePosition position;  // 전면,후면
-@property(nonatomic, assign, readonly) AVCaptureFlashMode flash;          // 자동,켬,끔
-@property(nonatomic, assign, readonly) AVCaptureFocusMode focusMode;          // 자동,고정,연속자동
-@property(nonatomic, assign, readonly) AVCaptureExposureMode exposureMode;    // 자동,고정,연속자동,커스텀
+@property(nonatomic, assign, readonly) CameraMode mode;                     // 사진,비디오
+@property(nonatomic, assign, readonly) AVCaptureDevicePosition position;    // 전면,후면
+@property(nonatomic, assign, readonly) AVCaptureFlashMode flash;            // 자동,켬,끔
+@property(nonatomic, assign, readonly) AVCaptureFocusMode focusMode;        // 자동,고정,연속자동
+@property(nonatomic, assign, readonly) AVCaptureExposureMode exposureMode;  // 자동,고정,연속자동,커스텀
 @property(nonatomic, assign, readonly) AVCaptureVideoStabilizationMode videoStabilizationMode;  // 비디오 손떨림방지모드
 @property(nonatomic, assign, readonly) BOOL livePhotoEnable;                                    // 라이브포토
 @property(nonatomic, assign, readonly) BOOL depthDataDeliveryEnable;                            // depth 데이터
@@ -210,7 +210,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 
 /**
  입력된 포인터로 포커스와 밝기를 자동으로 맞춘다.
- 
+
  @param point x:0.0~1.0 / y:0.0~1.0
  */
 - (void)setFocusExposurePoint:(CGPoint)point;
@@ -227,7 +227,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 /**
  라이브포토 활성화/비활성화
  defualt : NO
- 
+
  @param livePhotoEnable 활성화:YES, 비활성화:NO
  */
 - (void)setLivePhotoEnable:(BOOL)livePhotoEnable;
@@ -242,7 +242,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 /**
  depthDataDelivery 활성화/비활성화 (iOS11 이상만 활성화 가능)
  default : NO
- 
+
  @param depthDataDeliveryEnable 활성화:YES, 비활성화:NO
  */
 - (void)setDepthDataDeliveryEnable:(BOOL)depthDataDeliveryEnable;
@@ -258,7 +258,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
  portraitEffectsMatteEnable 활성화/비활성화
  (iOS12 이상만 활성화가능, depthDataDelivery가 활성화되어야 사용가능)
  default : NO
- 
+
  @param portraitEffectsMatteEnable 활성화:YES, 비활성화:NO
  */
 - (void)setPortraitEffectsMatteEnable:(BOOL)portraitEffectsMatteEnable;

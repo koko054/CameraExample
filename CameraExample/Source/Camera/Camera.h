@@ -39,6 +39,8 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 
 @interface Camera : NSObject
 
+@property(nonatomic, strong, readonly) AVCaptureSession *captureSession;
+
 @property(nonatomic, assign, readonly) CameraMode mode;                     // 사진,비디오
 @property(nonatomic, assign, readonly) AVCaptureDevicePosition position;    // 전면,후면
 @property(nonatomic, assign, readonly) AVCaptureFlashMode flash;            // 자동,켬,끔
@@ -84,12 +86,6 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
  */
 - (instancetype)init
     __attribute__((unavailable("Must use configureCamera: or congifureCameraWithMode:position:complete:  instead.")));
-
-/**
- 현재 캡쳐세션 AVCaptureVideoPreviewLayer의 session으로 설정하면 해당 Layer에
- 캡쳐한 영상이 나온다.
- */
-- (AVCaptureSession *)session;
 
 /**
  현재 활성화되어 있는 카메라의 해상도

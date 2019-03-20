@@ -28,6 +28,7 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
 @property(nonatomic, strong) AVCaptureSession *captureSession;   // 카메라 캡쳐세션
 @property(nonatomic, strong) AVCaptureDevice *cameraDevice;      //
 @property(nonatomic, strong) AVCaptureDeviceInput *videoInput;   // 비디오 영상 입력
+@property(nonatomic, strong) AVCaptureDeviceInput *audioInput;   // 오디오 입력
 @property(nonatomic, strong) AVCapturePhotoOutput *photoOutput;  // 사진,라이브포토 출력
 
 // 사진,포토라이브러리 캡쳐 관리
@@ -52,7 +53,7 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
   static dispatch_queue_t sessionQueue;
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
-    if (!sessionQueue) sessionQueue = dispatch_queue_create("session queue", DISPATCH_QUEUE_SERIAL);
+    if (!sessionQueue) sessionQueue = dispatch_queue_create("camera session queue", DISPATCH_QUEUE_SERIAL);
   });
   return sessionQueue;
 }
@@ -97,37 +98,14 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
     _exposureISO = -1.0;
     _exposureDuration = kCMTimeNegativeInfinity;
 
-    // 카메라모드에 따라 프리셋설정
-    AVCaptureSessionPreset preset = mode == CameraModePhoto ? AVCaptureSessionPresetPhoto : AVCaptureSessionPresetHigh;
-
-    [self.captureSession beginConfiguration];    // 캡쳐 세션 설정시작
-    self.captureSession.sessionPreset = preset;  // 프리셋적용
-
-    if (![self configureCameraDevice:error]) {  // 카메라설정하여 실패시 캡쳐 세션 설정종료 및 nil포인트반환
-      [self.captureSession commitConfiguration];
-      return nil;
-    }
-
-    // 오디오입력 캡쳐세션에 연결
-    AVCaptureDevice *audioDevice = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
-    AVCaptureDeviceInput *audioInput = [AVCaptureDeviceInput deviceInputWithDevice:audioDevice error:error];
-    if ([self.captureSession canAddInput:audioInput]) {
-      [self.captureSession addInput:audioInput];
-    }
-
-    // 사진출력 캡쳐세션에 연결
-    if ([self.captureSession canAddOutput:self.photoOutput]) {
-      [self.captureSession addOutput:self.photoOutput];
-    } else {
-      [self.captureSession commitConfiguration];
+    // 카메라모드와 포지션에 맞춰 캡쳐세션 구성(카메라디바이스생성, 세션프리셋, 비디오입력연결, 사진출력설정)
+    // 카메라설정하여 실패시 캡쳐 세션 설정종료 및 nil포인트반환
+    if (![self configureCaptureSessionForMode:_mode andPosition:_position error:error]) {
       return nil;
     }
 
     // 백그라운드ID 초기화
     self.backgroundRecordingID = UIBackgroundTaskInvalid;
-
-    // 캡쳐세션 설정 종료
-    [self.captureSession commitConfiguration];
 
     // 사진챕쳐딜리게이트를 저장하는 dictionary 설정 및 초기화
     self.inProgressPhotoCaptureDelegates = [NSMutableDictionary dictionary];
@@ -140,10 +118,6 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
 }
 
 #pragma mark - public functions
-// 외부 카메라출력뷰에 세션을 전달하기위한 함수
-- (AVCaptureSession *)session {
-  return self.captureSession;
-}
 
 // 현재 카메라 포맷의 해상도를 전달하기위한 함수
 - (CGSize)resolution {
@@ -167,57 +141,55 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
 - (void)takePhotoWithDelegate:(id<CameraCaptureUIDelegate>)uiDelegate
                      complete:(void (^)(UIImage *previewImage))complete {
   NSAssert(uiDelegate, @"uiDelegate can't be nil");
-  dispatch_async([Camera sessionQueue], ^{
-    // 현재 카메라화면의 오리엔테이션을 적용
-    AVCaptureConnection *photoOutputConnection = [self.photoOutput connectionWithMediaType:AVMediaTypeVideo];
-    photoOutputConnection.videoOrientation = [uiDelegate captureOrientation];
+  // 현재 카메라화면의 오리엔테이션을 적용
+  AVCaptureConnection *photoOutputConnection = [self.photoOutput connectionWithMediaType:AVMediaTypeVideo];
+  photoOutputConnection.videoOrientation = [uiDelegate captureOrientation];
 
-    // 사진촬영 설정객체 생성 (여기서 라이브포토로 찍을지, 그냥 사진촬영할지 결정된다. also depthDataDelivery)
-    AVCapturePhotoSettings *settings = [self configurePhotoSetting];
+  // 사진촬영 설정객체 생성 (여기서 라이브포토로 찍을지, 그냥 사진촬영할지 결정된다. also depthDataDelivery)
+  AVCapturePhotoSettings *settings = [self configurePhotoSetting];
 
-    // 라이브포토촬영시 촬영하는 데 시간이 걸리는데 연속해서 촬영할 경우 촬영프로세스를 여러개 동시에 돌리기 위해
-    // 실질적인 촬영기능을 CaptureDelegate 클래스로 분리하여 여러개의 객체를 생성하여 촬영한다.
-    CaptureDelegate *captureDelegate = [[CaptureDelegate alloc] initWithSettings:settings
-        captureAnimation:[uiDelegate captureAnimation]
-        livePhotoHandler:^(BOOL capturing) {
-          // 라이브포토 카운드 관리
-          if (capturing) {
-            self.inProgressLivePhotoCapturesCount++;
-          } else {
-            self.inProgressLivePhotoCapturesCount--;
-          }
-
-          NSInteger inProgressLivePhotoCapturesCount = self.inProgressLivePhotoCapturesCount;
-          dispatch_async(dispatch_get_main_queue(), ^{
-            if (inProgressLivePhotoCapturesCount > 0) {  // 라이브포토촬영이 진행중
-              [uiDelegate capturingLivePhoto:YES];
-            } else if (inProgressLivePhotoCapturesCount == 0) {  // 라이브포토촬영 완료
-              [uiDelegate capturingLivePhoto:NO];
-            } else {
-              NSLog(@"Error: In progress live photo capture count is less than "
-                    @"0");
-            }
-          });
+  // 라이브포토촬영시 촬영하는 데 시간이 걸리는데 연속해서 촬영할 경우 촬영프로세스를 여러개 동시에 돌리기 위해
+  // 실질적인 촬영기능을 CaptureDelegate 클래스로 분리하여 여러개의 객체를 생성하여 촬영한다.
+  CaptureDelegate *captureDelegate = [[CaptureDelegate alloc] initWithSettings:settings
+      captureAnimation:[uiDelegate captureAnimation]
+      livePhotoHandler:^(BOOL capturing) {
+        // 라이브포토 카운드 관리
+        if (capturing) {
+          self.inProgressLivePhotoCapturesCount++;
+        } else {
+          self.inProgressLivePhotoCapturesCount--;
         }
-        complete:^(CaptureDelegate *delegate) {  // 촬영완료
-          dispatch_async([Camera sessionQueue], ^{
-            // 촬영을 완료한 CaptureDelegate는 더 이상 필요없기 때문에 inProgressPhotoCaptureDelegates dictionary에서
-            // 제거한다.
-            self.inProgressPhotoCaptureDelegates[@(delegate.requestedPhotoSettings.uniqueID)] = nil;
-          });
-          dispatch_async(dispatch_get_main_queue(), ^{
-            if (complete) {
-              complete(delegate.previewImage);
-            }
-          });
-        }];
 
-    // 생성된 CaptureDelegate를 strong하게 가지고 있기위해 inProgressPhotoCaptureDelegates dictionary에 저장한다.
-    self.inProgressPhotoCaptureDelegates[@(captureDelegate.requestedPhotoSettings.uniqueID)] = captureDelegate;
+        NSInteger inProgressLivePhotoCapturesCount = self.inProgressLivePhotoCapturesCount;
+        dispatch_async(dispatch_get_main_queue(), ^{
+          if (inProgressLivePhotoCapturesCount > 0) {  // 라이브포토촬영이 진행중
+            [uiDelegate capturingLivePhoto:YES];
+          } else if (inProgressLivePhotoCapturesCount == 0) {  // 라이브포토촬영 완료
+            [uiDelegate capturingLivePhoto:NO];
+          } else {
+            NSLog(@"Error: In progress live photo capture count is less than "
+                  @"0");
+          }
+        });
+      }
+      complete:^(CaptureDelegate *delegate) {  // 촬영완료
+        dispatch_async([Camera sessionQueue], ^{
+          // 촬영을 완료한 CaptureDelegate는 더 이상 필요없기 때문에 inProgressPhotoCaptureDelegates dictionary에서
+          // 제거한다.
+          self.inProgressPhotoCaptureDelegates[@(delegate.requestedPhotoSettings.uniqueID)] = nil;
+        });
+        dispatch_async(dispatch_get_main_queue(), ^{
+          if (complete) {
+            complete(delegate.previewImage);
+          }
+        });
+      }];
 
-    // 캡쳐시작
-    [self.photoOutput capturePhotoWithSettings:settings delegate:captureDelegate];
-  });
+  // 생성된 CaptureDelegate를 strong하게 가지고 있기위해 inProgressPhotoCaptureDelegates dictionary에 저장한다.
+  self.inProgressPhotoCaptureDelegates[@(captureDelegate.requestedPhotoSettings.uniqueID)] = captureDelegate;
+
+  // 캡쳐시작
+  [self.photoOutput capturePhotoWithSettings:settings delegate:captureDelegate];
 }
 
 // 비디오촬영 중 인지 확인
@@ -295,7 +267,7 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
   UIBackgroundTaskIdentifier currentBackgroundRecordingID = self.backgroundRecordingID;
   self.backgroundRecordingID = UIBackgroundTaskInvalid;
 
-  // 촬영종료 후 초기화과정 블록 (임시저장파일 삭제 및 백그라운드가 종료되지 않은 경우 백그라운드태스크 종료)
+  // 촬영종료 후 초기화과정 코드블록 (임시저장파일 삭제 및 백그라운드가 종료되지 않은 경우 백그라운드태스크 종료)
   dispatch_block_t cleanUp = ^{
     if ([[NSFileManager defaultManager] fileExistsAtPath:outputFileURL.path]) {
       [[NSFileManager defaultManager] removeItemAtPath:outputFileURL.path error:NULL];
@@ -349,53 +321,7 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
 - (void)setMode:(CameraMode)mode {
   if (_mode != mode) {
     _mode = mode;
-    if (_mode == CameraModePhoto) {                             // 카메라모드일때
-      [self.captureSession beginConfiguration];                 // 캡쳐세션 설정시작
-      [self.captureSession removeOutput:self.movieFileOutput];  // 비디오출력 제거
-      self.movieFileOutput = nil;
-
-      self.captureSession.sessionPreset = AVCaptureSessionPresetPhoto;  // 사진 프리셋 설정
-
-      if (self.photoOutput.livePhotoCaptureSupported) {  // 라이브포토가 되면 적용
-        self.photoOutput.livePhotoCaptureEnabled = self.livePhotoEnable;
-      } else {
-        self.photoOutput.livePhotoCaptureEnabled = NO;
-      }
-
-      if (@available(iOS 11.0, *)) {  // depthDataDelivery가 되면 적용
-        if (self.photoOutput.depthDataDeliverySupported) {
-          self.photoOutput.depthDataDeliveryEnabled = self.depthDataDeliveryEnable;
-        } else {
-          self.photoOutput.depthDataDeliveryEnabled = NO;
-        }
-      }
-
-      if (@available(iOS 12.0, *)) {
-        if (self.photoOutput.portraitEffectsMatteDeliverySupported) {
-          self.photoOutput.portraitEffectsMatteDeliveryEnabled = self.portraitEffectsMatteEnable;
-        } else {
-          self.photoOutput.portraitEffectsMatteDeliveryEnabled = NO;
-        }
-      }
-
-      [self.captureSession commitConfiguration];  // 캡쳐세션 설정 종료
-    } else if (_mode == CameraModeVideo) {        // 비디오모드일때
-      AVCaptureMovieFileOutput *movieFileOutput = [[AVCaptureMovieFileOutput alloc] init];  // 비디오출력 생성
-      if ([self.captureSession canAddOutput:movieFileOutput]) {  // 생성된 비디오출력을 캡쳐세션에 추가할 수 있으면
-        [self.captureSession beginConfiguration];         // 캡쳐 세션 설정 시작
-        [self.captureSession addOutput:movieFileOutput];  // 비디오출력 추가
-
-        // 비디오안정화?기능이 지원되면 적용
-        AVCaptureConnection *connection = [movieFileOutput connectionWithMediaType:AVMediaTypeVideo];
-        if (connection.isVideoStabilizationSupported) {
-          connection.preferredVideoStabilizationMode = self.videoStabilizationMode;
-        }
-
-        self.captureSession.sessionPreset = AVCaptureSessionPresetHigh;  // 비디오 프리셋 설정
-        [self.captureSession commitConfiguration];                       // 캡쳐세션 설정 종료
-        self.movieFileOutput = movieFileOutput;                          // 현재 비디오출력 업데이트
-      }
-    }
+    [self configureCaptureSessionForMode:_mode andPosition:AVCaptureDevicePositionUnspecified error:nil];
   }
 }
 
@@ -411,7 +337,7 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
 - (void)setPosition:(AVCaptureDevicePosition)position {
   if (_position != position) {
     _position = position;
-    [self configureCameraDevice:nil];
+    [self configureCaptureSessionForMode:CameraModeUnknown andPosition:_position error:nil];
   }
 }
 
@@ -452,7 +378,7 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
                atDevicePoint:(CGPoint)point
     monitorSubjectAreaChange:(BOOL)monitorSubjectAreaChange {
   dispatch_async([Camera sessionQueue], ^{
-    AVCaptureDevice *device = self.videoInput.device;
+    AVCaptureDevice *device = self.cameraDevice;
     NSError *error = nil;
     if ([device lockForConfiguration:&error]) {
       /*
@@ -672,24 +598,99 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
   return _cameraDiscoverySession;
 }
 
-- (AVCaptureSession *)captureSession {
-  if (!_captureSession) {
-    _captureSession = [[AVCaptureSession alloc] init];
+- (BOOL)configureCaptureSessionForMode:(CameraMode)mode
+                           andPosition:(AVCaptureDevicePosition)position
+                                 error:(NSError **)error {
+  if (!self.captureSession) {  // 캡쳐세션이 없는 경우 생성
+    self.captureSession = [[AVCaptureSession alloc] init];
   }
-  return _captureSession;
+
+  [self.captureSession beginConfiguration];  // 캡셔설정 시작
+
+  if (mode == CameraModePhoto) {  // 사진모드인 경우
+    if (self.movieFileOutput) {  // 기존 비디오파일출력이 있으면 제거(사진모드에서는 필요없음)
+      [self.captureSession removeOutput:self.movieFileOutput];
+      self.movieFileOutput = nil;
+    }
+    self.captureSession.sessionPreset = AVCaptureSessionPresetPhoto;  // 사진모드 프리셋 설정
+  } else if (mode == CameraModeVideo) {                               // 비디오모드인 경우
+    // 비디오파일출력을 생성하여 캡쳐세션에 연결한다.
+    AVCaptureMovieFileOutput *movieFileOutput = [[AVCaptureMovieFileOutput alloc] init];
+    if ([self.captureSession canAddOutput:movieFileOutput]) {
+      [self.captureSession addOutput:movieFileOutput];
+
+      // 비디오안정화기능이 지원되면 적용
+      AVCaptureConnection *connection = [movieFileOutput connectionWithMediaType:AVMediaTypeVideo];
+      if (connection.isVideoStabilizationSupported) {
+        connection.preferredVideoStabilizationMode = self.videoStabilizationMode;
+      }
+      self.captureSession.sessionPreset = AVCaptureSessionPresetHigh;  // 비디오 프리셋 설정
+      self.movieFileOutput = movieFileOutput;
+    }
+  }
+
+  // 전/후면 카메라설정에만
+  if (position != AVCaptureDevicePositionUnspecified) {
+    // 해당 포지션의 카메라디바이스를 가져온다.
+    AVCaptureDevice *newDevice = [self cameraDeviceWithPosition:position error:error];
+    if (!newDevice) return NO;
+
+    AVCaptureDeviceInput *videoInput = [AVCaptureDeviceInput deviceInputWithDevice:newDevice error:error];
+    if (!videoInput) return NO;
+
+    // 기존 영상입력이 있는 경우 먼저 제거 후 생성한 영상입력을 캡쳐세션에 연결한다.
+    if (self.videoInput) {
+      [self.captureSession removeInput:self.videoInput];
+    }
+    if ([self.captureSession canAddInput:videoInput]) {
+      [self.captureSession addInput:videoInput];
+    } else {
+      *error = [Camera errorWithInfoString:@"Failed to connect video input"];
+      return NO;
+    }
+    self.cameraDevice = newDevice;
+    self.videoInput = videoInput;
+  }
+
+  // 오디오입력이 없는 경우 생성
+  if (!self.audioInput) {
+    AVCaptureDevice *audioDevice = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
+    self.audioInput = [AVCaptureDeviceInput deviceInputWithDevice:audioDevice error:error];
+    // 오디오입력을 캡쳐세션에 연결
+    if ([self.captureSession canAddInput:self.audioInput]) {
+      [self.captureSession addInput:self.audioInput];
+    }
+  }
+
+  // 사진출력이 없는 경우 생성
+  if (!self.photoOutput) {
+    self.photoOutput = [[AVCapturePhotoOutput alloc] init];
+    self.photoOutput.highResolutionCaptureEnabled = YES;
+    // 사진출력을 캡쳐세션에 연결
+    if ([self.captureSession canAddOutput:self.photoOutput]) {
+      [self.captureSession addOutput:self.photoOutput];
+    } else {
+      *error = [Camera errorWithInfoString:@"Failed to connect photo output"];
+      return NO;
+    }
+  }
+
+  // 사진출력 옵션설정
+  self.photoOutput.livePhotoCaptureEnabled = self.photoOutput.livePhotoCaptureSupported;
+  if (@available(iOS 11.0, *)) {
+    self.photoOutput.depthDataDeliveryEnabled = self.photoOutput.depthDataDeliverySupported;
+  }
+  if (@available(iOS 12.0, *)) {
+    self.photoOutput.portraitEffectsMatteDeliveryEnabled = self.photoOutput.portraitEffectsMatteDeliverySupported;
+  }
+
+  [self.captureSession commitConfiguration];
+  return YES;
 }
 
-- (AVCapturePhotoOutput *)photoOutput {
-  if (!_photoOutput) {
-    _photoOutput = [[AVCapturePhotoOutput alloc] init];
-    _photoOutput.highResolutionCaptureEnabled = YES;
-  }
-  return _photoOutput;
-}
-
-- (BOOL)configureCameraDevice:(NSError **)error {
+- (AVCaptureDevice *)cameraDeviceWithPosition:(AVCaptureDevicePosition)devicePosition error:(NSError **)error {
   AVCaptureDeviceType deviceType;
-  if (_position == AVCaptureDevicePositionFront) {
+  if (devicePosition == AVCaptureDevicePositionFront) {
     if (@available(iOS 11.1, *)) {
       deviceType = AVCaptureDeviceTypeBuiltInTrueDepthCamera;
     } else {
@@ -703,7 +704,7 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
   NSArray<AVCaptureDevice *> *devices = self.cameraDiscoverySession.devices;
 
   for (AVCaptureDevice *device in devices) {
-    if (device.position == _position && [device.deviceType isEqualToString:deviceType]) {
+    if (device.position == devicePosition && [device.deviceType isEqualToString:deviceType]) {
       newCameraDevice = device;
       break;
     }
@@ -711,70 +712,31 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
 
   if (!newCameraDevice) {
     for (AVCaptureDevice *device in devices) {
-      if (device.position == _position) {
+      if (device.position == devicePosition) {
         newCameraDevice = device;
         break;
       }
     }
   }
-
-  if (newCameraDevice) {
-    AVCaptureDeviceInput *newVideoInput = [AVCaptureDeviceInput deviceInputWithDevice:newCameraDevice error:error];
-    if (newVideoInput) {
-      [self.captureSession beginConfiguration];
-
-      if (self.videoInput) {
-        [self.captureSession removeInput:self.videoInput];
-      }
-
-      if ([self.captureSession canAddInput:newVideoInput]) {
-        [self.captureSession addInput:newVideoInput];
-        self.videoInput = newVideoInput;
-        self.cameraDevice = newCameraDevice;
-        _exposureISO = self.cameraDevice.ISO;
-        _exposureDuration = self.cameraDevice.exposureDuration;
-      } else if (self.videoInput) {
-        [self.captureSession addInput:self.videoInput];
-      } else {
-        [self.captureSession commitConfiguration];
-        return NO;
-      }
-
-      AVCaptureConnection *movieFileOutputConnection = [self.movieFileOutput connectionWithMediaType:AVMediaTypeVideo];
-      if (movieFileOutputConnection.isVideoStabilizationSupported) {
-        movieFileOutputConnection.preferredVideoStabilizationMode = self.videoStabilizationMode;
-      }
-
-      if (self.photoOutput.livePhotoCaptureSupported) {  // 라이브포토가 되면 적용
-        self.photoOutput.livePhotoCaptureEnabled = self.livePhotoEnable;
-      } else {
-        self.photoOutput.livePhotoCaptureEnabled = NO;
-      }
-
-      if (@available(iOS 11.0, *)) {  // depthDataDelivery가 되면 적용
-        if (self.photoOutput.depthDataDeliverySupported) {
-          self.photoOutput.depthDataDeliveryEnabled = self.depthDataDeliveryEnable;
-        } else {
-          self.photoOutput.depthDataDeliveryEnabled = NO;
-        }
-      }
-
-      if (@available(iOS 12.0, *)) {
-        if (self.photoOutput.portraitEffectsMatteDeliverySupported) {
-          self.photoOutput.portraitEffectsMatteDeliveryEnabled = self.portraitEffectsMatteEnable;
-        } else {
-          self.photoOutput.portraitEffectsMatteDeliveryEnabled = NO;
-        }
-      }
-
-      [self.captureSession commitConfiguration];
-    } else {
-      return NO;
-    }
-  } else {
-    return NO;
+  if (!newCameraDevice) {
+    NSString *reason = [NSString stringWithFormat:@"Failed to get camera device for position:%@",
+                                                  devicePosition == AVCaptureDevicePositionBack ? @"Back" : @"Front"];
+    *error = [Camera errorWithInfoString:reason];
   }
-  return YES;
+  return newCameraDevice;
+}
+
+- (void)setCameraDevice:(AVCaptureDevice *)cameraDevice {
+  if (_cameraDevice != cameraDevice) {
+    _cameraDevice = cameraDevice;
+    if (_cameraDevice) {
+      _exposureISO = _cameraDevice.ISO;
+      _exposureDuration = _cameraDevice.exposureDuration;
+    } else {
+      _exposureISO = -1.0;
+      _exposureDuration = kCMTimeNegativeInfinity;
+    }
+  }
 }
 
 - (AVCapturePhotoSettings *)configurePhotoSetting {
@@ -841,12 +803,8 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
     NSMutableDictionary *previewPhotoInfo = [NSMutableDictionary dictionary];
     [previewPhotoInfo setObject:setting.availablePreviewPhotoPixelFormatTypes.firstObject
                          forKey:(NSString *)kCVPixelBufferPixelFormatTypeKey];
-    if (self.previewPhotoSize.width > 0.0) {
-      [previewPhotoInfo setObject:@(self.previewPhotoSize.width) forKey:(NSString *)kCVPixelBufferWidthKey];
-    }
-    if (self.previewPhotoSize.height > 0.0) {
-      [previewPhotoInfo setObject:@(self.previewPhotoSize.height) forKey:(NSString *)kCVPixelBufferHeightKey];
-    }
+    [previewPhotoInfo setObject:@(self.previewPhotoSize.width) forKey:(NSString *)kCVPixelBufferWidthKey];
+    [previewPhotoInfo setObject:@(self.previewPhotoSize.height) forKey:(NSString *)kCVPixelBufferHeightKey];
     [setting setPreviewPhotoFormat:previewPhotoInfo];
   }
 
@@ -856,6 +814,8 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
     NSString *livePhotoMovieFilePath = [NSTemporaryDirectory()
         stringByAppendingPathComponent:[livePhotoMovieFileName stringByAppendingPathExtension:@"mov"]];
     setting.livePhotoMovieFileURL = [NSURL fileURLWithPath:livePhotoMovieFilePath];
+  } else {
+    setting.livePhotoMovieFileURL = nil;
   }
 
   // depth data 설정
@@ -885,7 +845,7 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(subjectAreaDidChange:)
                                                name:AVCaptureDeviceSubjectAreaDidChangeNotification
-                                             object:self.videoInput.device];
+                                             object:self.cameraDevice];
 
   // 캡쳐세션에 에러발생 시 호출되는 노티피케이션 등록
   [[NSNotificationCenter defaultCenter] addObserver:self
@@ -918,9 +878,8 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
   
   if (error.code == AVErrorMediaServicesWereReset) { // 미디어서비스가 리셋된경우
     dispatch_async([Camera sessionQueue], ^{
-      if (self.sessionRunning) { // 기존 캡쳐세션이 작동하기 있었으면 다시 시작
-        [self.captureSession startRunning];
-        self.sessionRunning = self.captureSession.isRunning;
+      if (self.sessionRunning) { // 기존 캡쳐세션이 작동하고 있었으면 다시 시작
+        [self startCapture];
       }
     });
   }
@@ -945,8 +904,17 @@ monitorSubjectAreaChange:NO];
 
 - (NSArray<NSString *> *)observingPropertyList {
   return @[
-           @"mode", @"position", @"flash", @"focus", @"exposure", @"videoStabilizationMode", @"livePhotoEnable", @"depthDataDeliveryEnable",
-           @"portraitEffectsMatteEnable", @"lensStabilizationEnable", @"photoFormat"
+           @"mode",
+           @"position",
+           @"flash",
+           @"focus",
+           @"exposure",
+           @"videoStabilizationMode",
+           @"livePhotoEnable",
+           @"depthDataDeliveryEnable",
+           @"portraitEffectsMatteEnable",
+           @"lensStabilizationEnable",
+           @"photoFormat"
            ];
 }
 
@@ -969,6 +937,16 @@ monitorSubjectAreaChange:NO];
     }
     @catch (NSException *exception) {}
   }
+}
+
+#pragma mark - error handling
+
++ (NSError *)errorWithInfoString:(NSString *)infoString {
+  NSDictionary *errorInfo;
+  if (infoString) {
+    errorInfo = @{NSLocalizedDescriptionKey : infoString};
+  }
+  return [NSError errorWithDomain:@"Camera" code:-1 userInfo:errorInfo];
 }
 
 @end

@@ -41,8 +41,7 @@
 }
 
 #pragma mark - AVCapturePhotoCaptureDelegate
-// AVCapturePhotoOutput의 capturePhotoWithSettings:delegate:함수를 호출하면 가장
-// 먼저 불리는 콜백
+// AVCapturePhotoOutput의 capturePhotoWithSettings:delegate:함수를 호출하면 가장 먼저 불리는 콜백
 - (void)captureOutput:(AVCapturePhotoOutput *)output
     willBeginCaptureForResolvedSettings:(AVCaptureResolvedPhotoSettings *)resolvedSettings {
   if ((resolvedSettings.livePhotoMovieDimensions.width > 0) && (resolvedSettings.livePhotoMovieDimensions.height > 0)) {
@@ -50,13 +49,12 @@
   }
 }
 
-// 캡쳐직전(셔터사운드가 들린후 바로) 호출되는 콜백(livePhoto는 셔터사운드가
-// 없음)
+// 캡쳐직전(셔터사운드가 들린후 바로) 호출되는 콜백(livePhoto는 셔터사운드가 없음)
 - (void)captureOutput:(AVCapturePhotoOutput *)output
     willCapturePhotoForResolvedSettings:(AVCaptureResolvedPhotoSettings *)resolvedSettings {
   if (self.captureAnimation) {
-    self.captureAnimation();  // 촬영관련 애니매이션을 실행한다. ex) white flash
-                              // animation
+    // 촬영관련 애니매이션을 실행한다. ex) white flash animation
+    self.captureAnimation();
   }
 }
 

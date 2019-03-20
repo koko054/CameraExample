@@ -76,7 +76,7 @@
         CGFloat width = self.view.frame.size.width;
         CGFloat height = ceil(cameraResolution.width * width / cameraResolution.height);
         self.previewView.frame = CGRectMake(0.0, 0.0, self.view.frame.size.width, height);
-        self.previewView.session = camera.session;
+        self.previewView.session = camera.captureSession;
         self.camera = camera;
         [self.camera startCapture];
         [self.camera addObserver:self];

@@ -43,9 +43,11 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 
 @property(nonatomic, assign, readonly) CameraMode mode;                     // 사진,비디오
 @property(nonatomic, assign, readonly) AVCaptureDevicePosition position;    // 전면,후면
-@property(nonatomic, assign, readonly) AVCaptureFlashMode flash;            // 자동,켬,끔
+@property(nonatomic, assign, readonly) AVCaptureFlashMode flashMode;        // 자동,켬,끔
+@property(nonatomic, assign, readonly) AVCaptureTorchMode torchMode;        // 자동,켬,끔
 @property(nonatomic, assign, readonly) AVCaptureFocusMode focusMode;        // 자동,고정,연속자동
 @property(nonatomic, assign, readonly) AVCaptureExposureMode exposureMode;  // 자동,고정,연속자동,커스텀
+@property(nonatomic, assign, readonly) AVCaptureWhiteBalanceMode whiteBalanceMode;  // 고정, 자동, 연속자동
 @property(nonatomic, assign, readonly) AVCaptureVideoStabilizationMode videoStabilizationMode;  // 비디오 손떨림방지모드
 @property(nonatomic, assign, readonly) BOOL livePhotoEnable;                                    // 라이브포토
 @property(nonatomic, assign, readonly) BOOL depthDataDeliveryEnable;                            // depth 데이터
@@ -53,10 +55,6 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 @property(nonatomic, assign, readonly) BOOL photoStabilizationEnable;    // 사진촬영시 손떨림방지기능
 @property(nonatomic, assign, readonly) PhotoFormat photoFormat;          // 사진포맷 (HEIF,JPEG,RAW,RAW/JPEG)
 @property(nonatomic, assign, readonly) CGSize previewPhotoSize;          // 썸네일크기
-
-@property(nonatomic, assign, readonly) CGFloat exposureISO;
-@property(nonatomic, assign, readonly) CMTime exposureDuration;
-@property(nonatomic, strong, readonly) NSArray<NSValue *> *exposureTimes;
 
 /**
  Camera 싱글톤객체를 async하게 생성한다.
@@ -170,12 +168,19 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 - (void)setPosition:(AVCaptureDevicePosition)position complete:(void (^)(void))complete;
 
 /**
- flash 모드 설정
+ 사진/비디오 촬영시 플래쉬모드 설정
  default : AVCaptureFlashModeAuto
 
- @param flash AVCaptureFlashModeOff, AVCaptureFlashModeOn, AVCaptureFlashModeAuto
+ @param flashMode AVCaptureFlashModeOff, AVCaptureFlashModeOn, AVCaptureFlashModeAuto
  */
-- (void)setFlash:(AVCaptureFlashMode)flash;
+- (void)setFlashMode:(AVCaptureFlashMode)flashMode;
+
+/**
+ 토치 모드 설정
+ default : AVCaptureTorchModeOff
+ @param torchMode AVCaptureTorchModeOff, AVCaptureTorchModeOn, AVCaptureTorchModeAuto
+ */
+- (void)setTorchMode:(AVCaptureTorchMode)torchMode;
 
 /**
  focus 모드 설정
@@ -188,11 +193,20 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 /**
  exposure 모드 설정
  default : AVCaptureExposureModeContinuousAutoExposure
+ 수동으로 exposureISO와 exposureDuration을 설정하기 위해서는 AVCaptureExposureModeCustom을 사용해야한다.
 
  @param exposureMode AVCaptureExposureModeLocked, AVCaptureExposureModeAutoExpose,
                  AVCaptureExposureModeContinuousAutoExposure, AVCaptureExposureModeCustom
  */
 - (void)setExposureMode:(AVCaptureExposureMode)exposureMode;
+
+/**
+ whiteBalance 모드 설정
+ default : AVCaptureWhiteBalanceModeContinuousAutoWhiteBalance
+
+ @param whiteBalanceMode AVCaptureWhiteBalanceModeLocked, AVCaptureWhiteBalanceModeAutoWhiteBalance, AVCaptureWhiteBalanceModeContinuousAutoWhiteBalance
+ */
+- (void)setWhiteBalanceMode:(AVCaptureWhiteBalanceMode)whiteBalanceMode;
 
 /**
  입력된 포인터로 포커스와 밝기를 자동으로 맞춘다.
@@ -275,34 +289,95 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 
 #pragma mark - manual camera
 
-// 카메라 조리개값 고정값
+/**
+ @return 카메라 조리개값 고정값
+ */
 - (CGFloat)aperture;
 
-// 카메라초점값 (0.0 ~ 1.0)
+/**
+ 현재 카메라초점값(0.0 ~ 1.0)
+ @return 0.0 ~ 1.0
+ */
 - (CGFloat)focus;
 
+/**
+ 수동초점조절을 위한 focus설정(0.0 ~ 1.0)
+ @param focus 0.0 ~ 1.0
+ */
 - (void)setFocus:(CGFloat)focus;
 
 // 카메라 밝기조절 (밝기조절은 DSLR과는 다르게 ISO와 셔터스피드로만 조절가능하다)
+/**
+ @return 최소 ISO값
+ */
 - (CGFloat)minExposureISO;
 
+/**
+ @return 최대 ISO값
+ */
 - (CGFloat)maxExposureISO;
 
-- (CGFloat)commitedExposureISO;
+/**
+ @return 현재 ISO값
+ */
+- (CGFloat)exposureISO;
 
-- (CMTime)minExposureDuration;
+/**
+ 수동밝기조절을 위한 ISO값 설정
+ exposureMode가 AVCaptureExposureModeCustom 인 경우에만 적용된다.
 
-- (CMTime)maxExposureDuration;
+ @param exposureISO minExposureISO와 maxExporsureISO 사이의 값
+ */
+- (void)setExposureISO:(CGFloat)exposureISO;
 
-- (CMTime)commitedExposureDuration;
+/**
+ @return 최소 셔터스피드값
+ */
+- (CGFloat)minExposureDuration;
 
-- (void)commitExposureISO:(CGFloat)exposureISO;
+/**
+ @return 최대 셔터스피드값
+ */
+- (CGFloat)maxExposureDuration;
 
-- (void)commitExposureDuration:(CMTime)exposureDuration;
+/**
+ @return 현재 셔터스피드값
+ */
+- (CGFloat)exposureDuration;
 
-- (void)commitExposureISO:(CGFloat)exposureISO duration:(CMTime)exposureDuration;
+/**
+ 수동밝기조절을 위한 셔터스피드값(초)이며 높은 값을 설정할수록 카메라캡쳐속도가 느려진다.
+ exposureMode가 AVCaptureExposureModeCustom 인 경우에만 적용된다.
 
-// 화이트밸런스
+ @param exposureDuration minExposureDuration와 maxExposureDuration 사이의 값
+ */
+- (void)setExposureDuration:(CGFloat)exposureDuration;
+
+/**
+ exposureISO와 exposureDuration를 동시에 적용하기 위한 메소드
+ */
+- (void)commitExposureISO:(CGFloat)exposureISO exposureDuration:(CGFloat)exposureDuration;
+
+/**
+ @return 최소 화이트밸런스 Gain값 1.0
+ */
+- (CGFloat)minWhiteBalanceGain;
+
+/**
+ @return 최대 화이트밸런스 Gain값
+ */
+- (CGFloat)maxWhiteBalanceGain;
+
+/**
+ @return 현재 화이트밸런스 Gain값
+ */
+- (AVCaptureWhiteBalanceGains)whiteBalanceGains;
+
+/**
+ 화이트밸런스 Gain 설정
+ @param whiteBalanceGains AVCaptureWhiteBalanceGains
+ */
+- (void)setWhiteBalanceGains:(AVCaptureWhiteBalanceGains)whiteBalanceGains;
 
 #pragma mark - KVO supports
 

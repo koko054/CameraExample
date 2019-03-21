@@ -75,24 +75,27 @@
         CGSize cameraResolution = camera.resolution;
         CGFloat width = self.view.frame.size.width;
         CGFloat height = ceil(cameraResolution.width * width / cameraResolution.height);
-        self.previewView.frame = CGRectMake(0.0, 0.0, self.view.frame.size.width, height);
+        self.previewView.frame = CGRectMake(0.0, 0.0, width, height);
         self.previewView.session = camera.captureSession;
         self.camera = camera;
         [self.camera startCapture];
         [self.camera addObserver:self];
         self.camera.depthDataDeliveryEnable = YES;
         self.camera.portraitEffectsMatteEnable = YES;
-        NSLog(@"dbtest init time:%f", CMTimeGetSeconds(self.camera.commitedExposureDuration));
-        NSLog(@"dbtest max duration:%f", CMTimeGetSeconds(self.camera.maxExposureDuration));
-        NSLog(@"dbtest max suttherSeed:%lld",
-              self.camera.maxExposureDuration.timescale / self.camera.maxExposureDuration.value);
-
-        NSLog(@"dbtest min duration:%f", CMTimeGetSeconds(self.camera.minExposureDuration));
-        NSLog(@"dbtest min suttherSeed:%lld",
-              self.camera.minExposureDuration.timescale / self.camera.minExposureDuration.value);
-        self.slider.minimumValue = 0.0;
-        self.slider.maximumValue = (CGFloat)self.camera.exposureTimes.count - 1;
-        self.slider.value = 1.0;
+//        NSLog(@"dbtest init v:%lld t:%d",self.camera.commitedExposureDuration.value, self.camera.commitedExposureDuration.timescale);
+//        NSLog(@"dbtest max v:%lld t:%d",self.camera.maxExposureDuration.value, self.camera.maxExposureDuration.timescale);
+//        NSLog(@"dbtest min v:%lld t:%d",self.camera.minExposureDuration.value, self.camera.minExposureDuration.timescale);
+//        NSLog(@"dbtest init time: %f",CMTimeGetSeconds(self.camera.commitedExposureDuration));
+//        NSLog(@"dbtest max time : %f",CMTimeGetSeconds(self.camera.maxExposureDuration));
+//        NSLog(@"dbtest min time : %f",CMTimeGetSeconds(self.camera.minExposureDuration));
+//        self.slider.minimumValue = CMTimeGetSeconds(self.camera.minExposureDuration);
+//        self.slider.maximumValue = CMTimeGetSeconds(self.camera.maxExposureDuration);
+//        self.slider.value = CMTimeGetSeconds(self.camera.commitedExposureDuration);
+        
+        self.slider.minimumValue = 1.0;
+        self.slider.maximumValue = self.camera.maxWhiteBalanceGain;
+        self.slider.value = self.camera.whiteBalanceGains.redGain;
+        
         [UIView animateWithDuration:0.3
                          animations:^{
                            self.previewView.alpha = 1.0;
@@ -304,7 +307,7 @@
     self.livePhotoButton.selected = self.camera.livePhotoEnable;
   } else if (sender == self.flashButton) {
     AVCaptureFlashMode nextFlash;
-    switch (self.camera.flash) {
+    switch (self.camera.flashMode) {
       case AVCaptureFlashModeOff:
         nextFlash = AVCaptureFlashModeOn;
         [self.flashButton setTitle:@"flash\nOn" forState:UIControlStateNormal];
@@ -320,7 +323,7 @@
       default:
         break;
     }
-    [self.camera setFlash:nextFlash];
+    [self.camera setFlashMode:nextFlash];
   } else if (sender == self.formatButton) {
     switch (self.camera.photoFormat) {
       case PhotoFormatHEIF:
@@ -374,13 +377,11 @@
 }
 
 - (void)sliderChanged:(UISlider *)slider {
-  //  [self.camera setFocus:slider.value];
-  [self.camera commitExposureISO:slider.value];
-  [self.camera commitExposureISO:slider.value duration:self.camera.exposureDuration];
-  //  NSInteger idx = (NSInteger)slider.value;
-  //  NSLog(@"dbtest idx:%ld",idx);
-  //  NSValue *timeValue = [self.camera.exposureTimes objectAtIndex:idx];
-  //  [self.camera commitExposureDuration:timeValue.CMTimeValue];
+  AVCaptureWhiteBalanceGains gain;
+  gain.redGain = slider.value;
+  gain.greenGain = self.camera.whiteBalanceGains.greenGain;
+  gain.blueGain = self.camera.whiteBalanceGains.blueGain;
+  self.camera.whiteBalanceGains = gain;
 }
 
 - (void)showCameraPreview:(BOOL)show {

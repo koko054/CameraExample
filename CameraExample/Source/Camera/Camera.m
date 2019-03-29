@@ -369,6 +369,32 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
         NSError *error;
         if ([device lockForConfiguration:&error]) {
           device.torchMode = torchMode;
+          self->_torchLevel = device.torchLevel;
+          [device unlockForConfiguration];
+        } else {
+          NSLog(@"Could not lock device for configuration: %@", error);
+        }
+      });
+    }
+  }
+}
+
+// torchLevel 설정
+- (void)setTorchLevel:(CGFloat)torchLevel {
+  if (_torchLevel != torchLevel) {
+    _torchLevel = MIN(torchLevel, AVCaptureMaxAvailableTorchLevel);
+    if (_torchLevel <= 0.0) { // torch level이 0.0으로 설정시 Crash발생, 0.0인 경우 off 모드로 전환
+      self.torchMode = AVCaptureTorchModeOff;
+    } else {
+      AVCaptureDevice *device = self.cameraDevice;
+      dispatch_async([Camera sessionQueue], ^{
+        NSError *error;
+        if ([device lockForConfiguration:&error]) {
+          if ([device setTorchModeOnWithLevel:self->_torchLevel error:&error]) {
+            self->_torchMode = AVCaptureTorchModeOn;
+          } else {
+            NSLog(@"Could not set torch level: %@", error);
+          }
           [device unlockForConfiguration];
         } else {
           NSLog(@"Could not lock device for configuration: %@", error);
@@ -546,6 +572,7 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
       NSError *error;
       if ([self.cameraDevice lockForConfiguration:&error]) {
         if ([self.cameraDevice isLockingFocusWithCustomLensPositionSupported]) {
+          self->_focusMode = AVCaptureFocusModeLocked;
           [self.cameraDevice setFocusModeLockedWithLensPosition:focus
                                               completionHandler:^(CMTime syncTime){
                                               }];
@@ -616,6 +643,7 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
       NSInteger value =
           (NSInteger)(MIN(MAX(self.duration, self.minExposureDuration), self.maxExposureDuration) * kTimeScale);
       CMTime duration = CMTimeMake(value, kTimeScale);
+      self->_exposureMode = AVCaptureExposureModeCustom;
       [self.cameraDevice setExposureModeCustomWithDuration:duration
                                                        ISO:iso
                                          completionHandler:^(CMTime syncTime) {
@@ -652,6 +680,7 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
       newGain.greenGain = MIN(whiteBalanceGains.greenGain, device.maxWhiteBalanceGain);
       newGain.blueGain = MIN(whiteBalanceGains.blueGain, device.maxWhiteBalanceGain);
       if ([device lockForConfiguration:&error]) {
+        self->_whiteBalanceMode = AVCaptureWhiteBalanceModeLocked;
         [device setWhiteBalanceModeLockedWithDeviceWhiteBalanceGains:newGain completionHandler:nil];
         [device unlockForConfiguration];
       } else {
@@ -819,9 +848,11 @@ BOOL floatsAreEquivalent(float left, float right) { return floatsAreEquivalentEp
     if (_cameraDevice) {
       _iso = _cameraDevice.ISO;
       _duration = CMTimeGetSeconds(_cameraDevice.exposureDuration);
+      _torchLevel = _cameraDevice.torchLevel;
     } else {
       _iso = -1.0;
       _duration = -1.0;
+      _torchLevel = 0.0;
     }
   }
 }

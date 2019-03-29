@@ -45,6 +45,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 @property(nonatomic, assign, readonly) AVCaptureDevicePosition position;    // 전면,후면
 @property(nonatomic, assign, readonly) AVCaptureFlashMode flashMode;        // 자동,켬,끔
 @property(nonatomic, assign, readonly) AVCaptureTorchMode torchMode;        // 자동,켬,끔
+@property(nonatomic, assign, readonly) CGFloat torchLevel;                  // Torch 세기
 @property(nonatomic, assign, readonly) AVCaptureFocusMode focusMode;        // 자동,고정,연속자동
 @property(nonatomic, assign, readonly) AVCaptureExposureMode exposureMode;  // 자동,고정,연속자동,커스텀
 @property(nonatomic, assign, readonly) AVCaptureWhiteBalanceMode whiteBalanceMode;  // 고정, 자동, 연속자동
@@ -131,6 +132,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 
 /**
  촬영종료
+
  @see startVideoRecording:complete
  */
 - (void)stopVideoRecording;
@@ -178,13 +180,23 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 /**
  토치 모드 설정
  default : AVCaptureTorchModeOff
+ 토치레벨을 수동으로 설정하면 AVCaptureTorchModeOn으로 변경된다.
+
  @param torchMode AVCaptureTorchModeOff, AVCaptureTorchModeOn, AVCaptureTorchModeAuto
  */
 - (void)setTorchMode:(AVCaptureTorchMode)torchMode;
 
 /**
+ 토치 레벨 설정 (사용하면 토치모드가 AVCaptureTorchModeOn으로 변경됨)
+
+ @param torchLevel 0.0 ~ AVCaptureMaxAvailableTorchLevel
+ */
+- (void)setTorchLevel:(CGFloat)torchLevel;
+
+/**
  focus 모드 설정
  default : AVCaptureFocusModeContinuousAutoFocus
+ 수동으로 focus를 설정하면 AVCaptureFocusModeLocked으로 변경된다.
 
  @param focusMode AVCaptureFocusModeLocked, AVCaptureFocusModeAutoFocus, AVCaptureFocusModeContinuousAutoFocus
  */
@@ -193,7 +205,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 /**
  exposure 모드 설정
  default : AVCaptureExposureModeContinuousAutoExposure
- 수동으로 exposureISO와 exposureDuration을 설정하기 위해서는 AVCaptureExposureModeCustom을 사용해야한다.
+ 수동으로 exposureISO와 exposureDuration을 설정하게되면 AVCaptureExposureModeCustom으로 변경된다.
 
  @param exposureMode AVCaptureExposureModeLocked, AVCaptureExposureModeAutoExpose,
                  AVCaptureExposureModeContinuousAutoExposure, AVCaptureExposureModeCustom
@@ -203,8 +215,10 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 /**
  whiteBalance 모드 설정
  default : AVCaptureWhiteBalanceModeContinuousAutoWhiteBalance
+ 수동으로 whiteBalanceGain을 설정하면 AVCaptureWhiteBalanceModeLocked으로 변경된다.
 
- @param whiteBalanceMode AVCaptureWhiteBalanceModeLocked, AVCaptureWhiteBalanceModeAutoWhiteBalance, AVCaptureWhiteBalanceModeContinuousAutoWhiteBalance
+ @param whiteBalanceMode AVCaptureWhiteBalanceModeLocked, AVCaptureWhiteBalanceModeAutoWhiteBalance,
+ AVCaptureWhiteBalanceModeContinuousAutoWhiteBalance
  */
 - (void)setWhiteBalanceMode:(AVCaptureWhiteBalanceMode)whiteBalanceMode;
 
@@ -266,7 +280,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 /**
  손떨림방지기능 활성화/비활성화
  default : YES
- 
+
  @param photoStabilizationEnable 활성화:YES, 비활성화:NO
  */
 - (void)setPhotoStabilizationEnable:(BOOL)photoStabilizationEnable;
@@ -274,7 +288,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 /**
  사진 포맷
  default : PhotoFormatHEIF
- 
+
  @param photoFormat PhotoFormatHEIF, PhotoFormatJPEG, PhotoFormatRAW, PhotoFormatRAWHEIF, PhotoFormatRAWJPEG
  */
 - (void)setPhotoFormat:(PhotoFormat)photoFormat;
@@ -282,7 +296,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 /**
  썸네일크기 설정
  default : CGSizeZero
- 
+
  @param previewPhotoSize 썸네일크기
  */
 - (void)setPreviewPhotoSize:(CGSize)previewPhotoSize;
@@ -296,12 +310,14 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 
 /**
  현재 카메라초점값(0.0 ~ 1.0)
+ 
  @return 0.0 ~ 1.0
  */
 - (CGFloat)focus;
 
 /**
  수동초점조절을 위한 focus설정(0.0 ~ 1.0)
+ 
  @param focus 0.0 ~ 1.0
  */
 - (void)setFocus:(CGFloat)focus;
@@ -325,7 +341,7 @@ typedef NS_ENUM(NSInteger, PhotoFormat) {
 /**
  수동밝기조절을 위한 ISO값 설정
  exposureMode가 AVCaptureExposureModeCustom 인 경우에만 적용된다.
-
+ 
  @param exposureISO minExposureISO와 maxExporsureISO 사이의 값
  */
 - (void)setExposureISO:(CGFloat)exposureISO;
